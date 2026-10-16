@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Error - Pagina no encontrada</title>
+
+
+    <link rel="stylesheet" href="https://www.termoprol.com.br/assets/site/css/reset.css" type="text/css">
+    <link rel="stylesheet" href="https://www.termoprol.com.br/assets/site/css/estilo.css" type="text/css">
+    <link rel="stylesheet" href="https://www.termoprol.com.br/assets/site/css/main.css" type="text/css">
+    <link rel="stylesheet" href="https://www.termoprol.com.br/assets/site/css/responsive.css" type="text/css">
+    <link rel="stylesheet" href="https://www.termoprol.com.br/assets/site/js/plugins/magnific-popup/magnific-popup.css" />
+
+</head>
+<body class="def-100 relative">
+<div class="fixed top-0 left-0 top-fix"></div>
+<div class="def-100 false-header"></div>
+<header class="def-100 p-top-30 p-bottom-30 bg-grey absolute z-index-999 top-0 left-0 p-top-1024-15 p-bottom-1024-15">
+    <div class="def-center">
+        <figure class="f-left c-left main-logo">
+            <a href="https://www.termoprol.com.br" title="Termoprol">
+                <img src="https://www.termoprol.com.br/assets/site/images/main-logo.png" title="Termoprol" alt="Termoprol" loading="lazy" />
+            </a>
+        </figure>
+        <!--div class="f-left c-left m-top-7 m-left-80-px">
+            <nav>
+                <ul>
+                    <li>
+                        <a href="" title="">
+                            <img src="assets/site/images/icons/icon-facebook.png" title="" alt="" loading="lazy" />
+                        </a>
+                    </li>
+                    <li class="m-left-10-px">
+                        <a href="" title="">
+                            <img src="assets/site/images/icons/icon-twitter.png" title="" alt="" loading="lazy" />
+                        </a>
+                    </li>
+                    <li class="m-left-10-px">
+                        <a href="" title="">
+                            <img src="assets/site/images/icons/icon-phone.png" title="" alt="" loading="lazy" />
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="m-left-10-px phone-top">
+                <span class="m-top-7">
+                    Atendimento (51) 3341 4805
+                </span>
+                <span class="c-both m-top-5">
+                    Comercial: (51) 3083 5407
+                </span>
+            </div>
+        </div-->
+        <a class="def-50-px f-right m-top-14 m-left-20-px action-menu none display-1024-block" href="javascript:void(0);" title="abrir menu">
+            <span class="def-100 def-h-5-px b-radius-3 bg-blue"></span>
+            <span class="def-100 def-h-5-px m-top-5 b-radius-3 bg-blue"></span>
+            <span class="def-100 def-h-5-px m-top-5 b-radius-3 bg-blue"></span>
+        </a>
+        <nav class="f-right c-left main-menu display-1024-none">
+            <ul>
+                <li class="none display-1024-block">
+                    <a class="close-menu" href="javascript:void(0);" title="FECHAR">
+                        <span>
+                            <b>
+                                FECHAR
+                            </b>
+                        </span>
+                    </a>
+                </li>
+                <li class="none display-1024-block">
+                    <a  href="https://www.termoprol.com.br" title="HOME">
+                        <span>
+                            <b>
+                                HOME
+                            </b>
+                        </span>
+                    </a>
+                </li>
+                <li>
+                    <a  href="https://www.termoprol.com.br/empresa" title="EMPRESA">
+                        <span>
+                            <b>
+                                EMPRESA
+                            </b>
+                        </span>
+						<img class="absolute top-100 left-50" src="https://www.termoprol.com.br/assets/site/images/icons/active-menu.png" title="EMPRESA" alt="EMPRESA" loading="lazy" />
+                    </a>
+                </li>
+                <li>
+                    <a  href="https://www.termoprol.com.br/aplicacoes" title="SEGMENTOS">
+                        <span>
+                            <b>
+                                APLICAÇÕES
+                            </b>
+                        </span>
+						<img class="absolute top-100 left-50" src="https://www.termoprol.com.br/assets/site/images/icons/active-menu.png" title="SEGMENTOS" alt="SEGMENTOS" loading="lazy" />
+                    </a>
+                </li>               
+                <li>
+                    <a  href="https://www.termoprol.com.br/equipamentos" title="EQUIPAMENTOS">
+                        <span>
+                            <b>
+                                EQUIPAMENTOS
+                            </b>
+                        </span>
+						<img class="absolute top-100 left-50" src="https://www.termoprol.com.br/assets/site/images/icons/active-menu.png" title="EQUIPAMENTOS" alt="EQUIPAMENTOS" loading="lazy" />
+                    </a>
+                </li>
+                <li>
+                    <a  href="https://www.termoprol.com.br/pecas" title="PEÇAS">
+                        <span>
+                            <b>
+                                PEÇAS
+                            </b>
+                        </span>
+						<img class="absolute top-100 left-50" src="https://www.termoprol.com.br/assets/site/images/icons/active-menu.png" title="PEÇAS" alt="PEÇAS" loading="lazy" />
+                    </a>
+                </li>
+                <li>
+                    <a  href="https://www.termoprol.com.br/obras" title="OBRAS">
+                        <span>
+                            <b>
+                                OBRAS
+                            </b>
+                        </span>
+						<img class="absolute top-100 left-50" src="https://www.termoprol.com.br/assets/site/images/icons/active-menu.png" title="OBRAS" alt="OBRAS" loading="lazy" />
+                    </a>
+                </li>
+                <li>
+                    <a  href="https://www.termoprol.com.br/noticias" title="NOTÍCIAS">
+                        <span>
+                            <b>
+                                NOTÍCIAS
+                            </b>
+                        </span>
+						<img class="absolute top-100 left-50" src="https://www.termoprol.com.br/assets/site/images/icons/active-menu.png" title="NOTÍCIAS" alt="NOTÍCIAS" loading="lazy" />
+                    </a>
+                </li>
+                <li>
+                    <a  href="https://www.termoprol.com.br/orcamento" title="ORÇAMENTO">
+                        <span>
+                            <b>
+                                ORÇAMENTO
+                            </b>
+                        </span>
+						<img class="absolute top-100 left-50" src="https://www.termoprol.com.br/assets/site/images/icons/active-menu.png" title="ORÇAMENTO" alt="ORÇAMENTO" loading="lazy" />
+                    </a>
+                </li>
+                <li class="relative">
+                    <a  href="https://www.termoprol.com.br/contato" title="CONTATO">
+                        <span>
+                            <b>
+                                CONTATO
+                            </b>
+                        </span>
+						<img class="absolute top-100 left-50" src="https://www.termoprol.com.br/assets/site/images/icons/active-menu.png" title="CONTATO" alt="CONTATO" loading="lazy" />
+                    </a>
+                    <nav class="def-600-px absolute top-100 right-0 none">
+                        <div class="def-100 def-h-20-px absolute top-0 left-0 z-index-2 marker-submenu"></div>
+                        <ul class="def-100 m-top-5 relative z-index-1">
+                            <li class="def-33-33 def-h-70-px">
+                                <a class="def-100 def-h-100" href="https://www.termoprol.com.br/contato" title="Fale Conosco">
+                                    <span class="def-100 def-h-100 table t-align-c">
+                                        <b class="inline f-none">
+                                            <i class="f-none">Fale Conosco</i>
+                                        </b>
+                                    </span>
+                                </a>
+                            </li>
+                            <li class="def-33-33 def-h-70-px">
+                                <a class="def-100 def-h-100" href="https://www.termoprol.com.br/trabalhe-conosco" title="Trabalhe Conosco">
+                                    <span class="def-100 def-h-100 table t-align-c">
+                                        <b class="inline f-none">
+                                            <i class="f-none">Trabalhe Conosco</i>
+                                        </b>
+                                    </span>
+                                </a>
+                            </li>
+                            <li class="def-33-33 def-h-70-px">
+                                <a class="def-100 def-h-100" href="https://docs.google.com/forms/d/e/1FAIpQLSelaxM-7jQ-15riyRhVr_n7h5Wo2IwGch82gFOxxQYHb3hA6Q/viewform?usp=header" target="_blank" title="Assistência Técnica">
+                                    <span class="def-100 def-h-100 table t-align-c">
+                                        <b class="inline f-none">
+                                            <i class="f-none">Assistência Técnica</i>
+                                        </b>
+                                    </span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </li>
+                <li class="none display-1024-none">
+                    <a href="https://www.termoprol.com.br/trabalhe-conosco" title="Trabalhe Conosco">
+                        <span>
+                            <b>
+                                Trabalhe Conosco
+                            </b>
+                        </span>
+                    </a>
+                </li>
+                <li class="none display-1024-none">
+                    <a href="https://docs.google.com/forms/d/e/1FAIpQLSelaxM-7jQ-15riyRhVr_n7h5Wo2IwGch82gFOxxQYHb3hA6Q/viewform?usp=header" target="_blank" title="Assistência Técnica">
+                        <span>
+                            <b>
+                                Assistência Técnica
+                            </b>
+                        </span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</header><div class="def-100 p-top-180 p-bottom-180 box-404 p-top-1024-30 p-bottom-1024-30">
+    <div class="def-center">
+        <div class="def-80 m-left-10 d_flex wrap justify-center direction-800-column">
+            <aside class="def-400-px self-center w-1024-40 w-800-100 t-align-800-c">
+                <h1 class="def-100 f-size-65 def-title f-size-1024-26 f-size-600-2">
+                    Página não encontrada
+                </h1>
+                <h2 class="def-100 m-top-25 f-size-35 def-title f-size-1024-26 f-size-600-2">
+                    (Erro 404)
+                </h2>
+                <div class="def-100  m-top-40 m-top-1024-30">
+                    <a class="display-inline-block b-radius-10 relative see-more see-more-2 smooth" href="https://www.termoprol.com.br" title="IR PARA HOME">
+                        IR PARA HOME
+                        <img class="def-100 absolute top-100 left-0 m-top-3-neg" src="https://www.termoprol.com.br/assets/site/images/icons/ice.png" title="IR PARA HOME" alt="IR PARA HOME">
+                    </a>
+                </div>
+            </aside>
+            <figure class="flex-1 m-left-60-px d_flex wrap justify-center w-800-100 m-top-800-60">
+                <img class="max-w-100 self-center" src="https://www.termoprol.com.br/assets/site/images/icons/404.png" alt="Página não encontrada!" title="Página não encontrada!" />
+            </figure>
+        </div>
+    </div>
+</div>
+<div class="def-100 p-top-80 p-bottom-80 bg-blue-2 p-top-1024-30 p-bottom-1024-30">
+    <div class="def-center">
+        <div class="def-48 w-800-100" data-scroll-reveal="enter left move 80px">
+            <h2 class="def-100 l-height-12 t-align-c t-upper def-title f-size-1024-26 f-size-600-2">
+                Nós<br/> queremos<br/> ouvir você
+            </h2>
+            <div class="def-100 m-top-20 t-align-c">
+                <div class="def-100">
+                    <span class="display-inline-block def-300-px def-h-2-px f-none bg-blue"></span>
+                </div>
+                <figure class="def-100 m-top-18-neg t-align-c">
+                    <img class="display-inline-block" src="https://www.termoprol.com.br/assets/site/images/icons/marker-title.png"
+                         alt="Nós queremos ouvir você" title="Nós queremos ouvir você"/>
+                </figure>
+            </div>
+                                    <nav class="def-100 list-group-contacts">
+                <ul class="def-100 t-align-c">
+                                                                            </ul>
+            </nav>
+        </div>
+		                		<div class="def-48 f-right w-800-100 m-top-800-30" data-scroll-reveal="enter right move 80px">
+			<a class="def-100" href="https://maps.app.goo.gl/QEnj4w5EaZfFMjtU9" target="_blank" title="Ver no Google Maps">
+				<img class="def-100" src="https://www.termoprol.com.br/uploads/page/410f55d43e750c85072b29a731996e09.jpg" title="Ver no Google Maps" alt="Ver no Google Maps" loading="lazy" />
+			</a>
+		</div>
+            </div>
+</div>
+    <div class="def-100 p-top-80 p-bottom-80 p-top-1024-30 p-bottom-1024-30">
+    <div class="def-100 relative">
+        <div class="def-center">
+            <div class="def-100 t-align-c">
+                <div class="def-40-px def-h-100 absolute z-index-1 top-0 left-0 bg-blue display-800-none"></div>
+                <div class="def-40-px def-h-100 absolute z-index-1 top-0 right-0 bg-blue display-800-none"></div>
+                <form action="https://www.termoprol.com.br/contato/store" method="POST" class="display-inline-block def-800-px max-w-100 bg-white relative z-index-2 f-none def-form" id="fContact">
+                    <input type="hidden" name="_token" value="" autocomplete="off">                    <label class="def-100 m-bottom-10 t-align-c color-blue f-size-35 m-top-1024-0 f-size-1024-26 f-size-600-2">
+                        Ou envie uma mensagem
+                    </label>
+                    <fieldset class="def-49 m-top-20 w-800-100">
+                        <input class="def-100 b-radius-10 overflow-h" type="text" name="name" placeholder="Nome *" required />
+                    </fieldset>
+                    <fieldset class="def-49 f-right m-top-20 w-800-100">
+                        <input class="def-100 b-radius-10 overflow-h masked-phone" type="text" name="phone" placeholder="Telefone *" required />
+                    </fieldset>
+                    <fieldset class="def-100 m-top-20">
+                        <input class="def-100 b-radius-10 overflow-h" type="email" name="email" placeholder="E-mail *" required />
+                    </fieldset>
+                    <fieldset class="def-100 m-top-20">
+                        <textarea class="def-100 b-radius-10 overflow-h" name="message" placeholder="Mensagem *" required></textarea>
+                    </fieldset>
+						<input type="hidden" required id="g-recaptcha-response-footer" name="g-recaptcha-response" />
+                    <div class="def-100 m-top-40 t-align-c m-top-1024-20 send-contact">
+                        <div class="display-inline-block">
+                            <div class="f-left relative">
+                                <input class="def-230-px b-radius-10 pointer smooth" type="submit" value="ENVIAR" />
+                                <img class="def-100 absolute top-100 left-0 m-top-3-neg" src="https://www.termoprol.com.br/assets/site/images/icons/ice.png" title="ENVIAR" alt="ENVIAR" loading="lazy" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="def-msg m-top-30 def-100 f-size-16 t-align-c"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div><footer class="def-100 p-bottom-5">
+    <div class="def-100 p-top-15 p-bottom-15 bg-blue">
+        <div class="def-center">
+            <div class="f-left w-1024-100 t-align-1024-c" style="color: #FFFFFF;">
+                TERMOPROL ZANOTTI DO BRASIL LTDA – CNPJ: 88165931/0001-90
+            </div>
+            <div class="f-right w-1024-100 t-align-1024-c">
+                <a class="display-inline-block color-white f-size-12 t-decoration" href="https://www.agencias3.com.br"
+                   target="_blank" title="Agência s3">
+                    Agência s3 2026
+                </a>
+            </div>
+        </div>
+    </div>
+</footer></body>
+</html>

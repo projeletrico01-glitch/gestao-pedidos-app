@@ -1,0 +1,6 @@
+{
+  "name": "Gestão de Pedidos & Confecção",
+  "description": "Sistema de controle de pedidos de venda, catálogo de componentes, confecção de ambientes, importação e exportação Excel e cronograma de entregas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

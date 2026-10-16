@@ -1,0 +1,18 @@
+<svg width="450" height="130" viewBox="0 0 450 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer Cyan Ring -->
+  <circle cx="65" cy="65" r="58" stroke="#1eaaf1" stroke-width="4" fill="none"/>
+  <!-- Middle White Gap -->
+  <circle cx="65" cy="65" r="55.5" fill="white"/>
+  <!-- Inner Solid Cyan Circle -->
+  <circle cx="65" cy="65" r="50" fill="#1eaaf1"/>
+
+  <!-- Exact Monogram Geometry (scaled from 500x500 to ~100x100) -->
+  <g transform="translate(15, 15) scale(0.2)">
+    <path d="M 110,145 L 390,145 L 390,185 L 290,315 L 390,315 L 390,350 L 110,350 L 110,220 L 225,220 L 225,185 L 110,185 Z" fill="white"/>
+    <polygon points="260,185 325,185 260,270" fill="#1eaaf1"/>
+  </g>
+
+  <!-- Official Brand Typography -->
+  <text x="140" y="66" font-family="'Inter', -apple-system, sans-serif" font-weight="900" font-size="34" fill="#2b2829" letter-spacing="-0.5">TERMOPROL</text>
+  <text x="142" y="90" font-family="'Inter', -apple-system, sans-serif" font-weight="400" font-size="14" fill="#3f3c3d" letter-spacing="0.2">Tecnologia em refrigeração</text>
+</svg>
