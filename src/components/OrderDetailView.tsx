@@ -18,7 +18,8 @@ import {
   Calendar,
   Sparkles,
   LayoutGrid,
-  ListOrdered
+  ListOrdered,
+  Minus
 } from 'lucide-react';
 import { Order, OrderStatus, Environment, Machine, CodeItem, CatalogItem } from '../types';
 import { calculateRemainingDays, getRelativeDate } from '../utils/excel';
@@ -48,6 +49,16 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   const [envDisplayMode, setEnvDisplayMode] = useState<'tabs' | 'cards'>('tabs');
   const [activeEnvTab, setActiveEnvTab] = useState(0);
 
+  // Quick Add states for each section
+  const [quickMachineCode, setQuickMachineCode] = useState<{ [machineId: string]: string }>({});
+  const [quickMachineQty, setQuickMachineQty] = useState<{ [machineId: string]: number }>({});
+
+  const [quickPanelCode, setQuickPanelCode] = useState<{ [envId: string]: string }>({});
+  const [quickPanelQty, setQuickPanelQty] = useState<{ [envId: string]: number }>({});
+
+  const [quickAccCode, setQuickAccCode] = useState<{ [envId: string]: string }>({});
+  const [quickAccQty, setQuickAccQty] = useState<{ [envId: string]: number }>({});
+
   useEffect(() => {
     setCurrentOrder(JSON.parse(JSON.stringify(order)));
     setHasUnsavedChanges(false);
@@ -61,9 +72,9 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   const totalMachines = currentOrder.environments?.reduce((acc, env) => 
     acc + (env.machines?.reduce((mAcc, m) => mAcc + (m.quantity || 1), 0) || 0), 0) || 0;
   const totalPanelItems = currentOrder.environments?.reduce((acc, env) => 
-    acc + (env.panel?.items?.length || 0), 0) || 0;
+    acc + (env.panel?.items?.reduce((pAcc, p) => pAcc + (p.quantity || 1), 0) || 0), 0) || 0;
   const totalAccessories = currentOrder.environments?.reduce((acc, env) => 
-    acc + (env.accessories?.length || 0), 0) || 0;
+    acc + (env.accessories?.reduce((aAcc, a) => aAcc + (a.quantity || 1), 0) || 0), 0) || 0;
 
   // Auto lookup helper: returns item name if code matches in catalog
   const lookupNameByCode = (code: string): string | null => {
@@ -98,14 +109,14 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           id: 'm-' + Date.now(),
           name: '',
           quantity: 1,
-          items: [{ code: '', name: '' }]
+          items: [{ code: '', name: '', quantity: 1 }]
         }
       ],
       panel: {
         description: '',
-        items: [{ code: '', name: '' }]
+        items: [{ code: '', name: '', quantity: 1 }]
       },
-      accessories: [{ code: '', name: '' }]
+      accessories: [{ code: '', name: '', quantity: 1 }]
     };
 
     setCurrentOrder(prev => ({
@@ -164,7 +175,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
       id: 'm-' + Date.now(),
       name: '',
       quantity: 1,
-      items: [{ code: '', name: '' }]
+      items: [{ code: '', name: '', quantity: 1 }]
     });
     setCurrentOrder(prev => ({ ...prev, environments: updated }));
     setHasUnsavedChanges(true);
@@ -184,12 +195,38 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     setHasUnsavedChanges(true);
   };
 
-  const handleAddMachineItem = (envIdx: number, mIdx: number) => {
+  // Machine Items (Components) operations
+  const handleAddMachineItem = (envIdx: number, mIdx: number, defaultQty: number = 1) => {
     const updated = [...currentOrder.environments];
     if (!updated[envIdx].machines[mIdx].items) updated[envIdx].machines[mIdx].items = [];
-    updated[envIdx].machines[mIdx].items.push({ code: '', name: '' });
+    updated[envIdx].machines[mIdx].items.push({ code: '', name: '', quantity: defaultQty });
     setCurrentOrder(prev => ({ ...prev, environments: updated }));
     setHasUnsavedChanges(true);
+  };
+
+  const handleQuickAddMachineItem = (envIdx: number, mIdx: number, machineId: string) => {
+    const rawCode = (quickMachineCode[machineId] || '').trim();
+    const qty = quickMachineQty[machineId] || 1;
+    if (!rawCode) {
+      onShowToast('Digite ou selecione o código do item para adicionar.', 'warning');
+      return;
+    }
+    const upperCode = rawCode.toUpperCase();
+    const name = lookupNameByCode(upperCode) || '';
+
+    const updated = [...currentOrder.environments];
+    if (!updated[envIdx].machines[mIdx].items) updated[envIdx].machines[mIdx].items = [];
+    updated[envIdx].machines[mIdx].items.push({
+      code: upperCode,
+      name: name,
+      quantity: Math.max(1, qty)
+    });
+
+    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    setHasUnsavedChanges(true);
+    setQuickMachineCode(prev => ({ ...prev, [machineId]: '' }));
+    setQuickMachineQty(prev => ({ ...prev, [machineId]: 1 }));
+    onShowToast(`Adicionado: ${qty}x [${upperCode}] ${name || 'item'}`, 'success');
   };
 
   const handleRemoveMachineItem = (envIdx: number, mIdx: number, iIdx: number) => {
@@ -222,6 +259,13 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     setHasUnsavedChanges(true);
   };
 
+  const handleMachineItemQtyChange = (envIdx: number, mIdx: number, iIdx: number, qty: number) => {
+    const updated = [...currentOrder.environments];
+    updated[envIdx].machines[mIdx].items[iIdx].quantity = Math.max(1, qty || 1);
+    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    setHasUnsavedChanges(true);
+  };
+
   // Panel operations
   const handleUpdatePanelDesc = (envIdx: number, desc: string) => {
     const updated = [...currentOrder.environments];
@@ -231,13 +275,39 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     setHasUnsavedChanges(true);
   };
 
-  const handleAddPanelItem = (envIdx: number) => {
+  const handleAddPanelItem = (envIdx: number, defaultQty: number = 1) => {
     const updated = [...currentOrder.environments];
     if (!updated[envIdx].panel) updated[envIdx].panel = { description: '', items: [] };
     if (!updated[envIdx].panel.items) updated[envIdx].panel.items = [];
-    updated[envIdx].panel.items.push({ code: '', name: '' });
+    updated[envIdx].panel.items.push({ code: '', name: '', quantity: defaultQty });
     setCurrentOrder(prev => ({ ...prev, environments: updated }));
     setHasUnsavedChanges(true);
+  };
+
+  const handleQuickAddPanelItem = (envIdx: number, envId: string) => {
+    const rawCode = (quickPanelCode[envId] || '').trim();
+    const qty = quickPanelQty[envId] || 1;
+    if (!rawCode) {
+      onShowToast('Digite ou selecione o código do componente do quadro.', 'warning');
+      return;
+    }
+    const upperCode = rawCode.toUpperCase();
+    const name = lookupNameByCode(upperCode) || '';
+
+    const updated = [...currentOrder.environments];
+    if (!updated[envIdx].panel) updated[envIdx].panel = { description: '', items: [] };
+    if (!updated[envIdx].panel.items) updated[envIdx].panel.items = [];
+    updated[envIdx].panel.items.push({
+      code: upperCode,
+      name: name,
+      quantity: Math.max(1, qty)
+    });
+
+    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    setHasUnsavedChanges(true);
+    setQuickPanelCode(prev => ({ ...prev, [envId]: '' }));
+    setQuickPanelQty(prev => ({ ...prev, [envId]: 1 }));
+    onShowToast(`Adicionado ao Quadro: ${qty}x [${upperCode}] ${name || 'item'}`, 'success');
   };
 
   const handleRemovePanelItem = (envIdx: number, pIdx: number) => {
@@ -269,13 +339,45 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     setHasUnsavedChanges(true);
   };
 
-  // Accessories operations
-  const handleAddAccessory = (envIdx: number) => {
+  const handlePanelItemQtyChange = (envIdx: number, pIdx: number, qty: number) => {
     const updated = [...currentOrder.environments];
-    if (!updated[envIdx].accessories) updated[envIdx].accessories = [];
-    updated[envIdx].accessories.push({ code: '', name: '' });
+    updated[envIdx].panel.items[pIdx].quantity = Math.max(1, qty || 1);
     setCurrentOrder(prev => ({ ...prev, environments: updated }));
     setHasUnsavedChanges(true);
+  };
+
+  // Accessories operations
+  const handleAddAccessory = (envIdx: number, defaultQty: number = 1) => {
+    const updated = [...currentOrder.environments];
+    if (!updated[envIdx].accessories) updated[envIdx].accessories = [];
+    updated[envIdx].accessories.push({ code: '', name: '', quantity: defaultQty });
+    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleQuickAddAccessory = (envIdx: number, envId: string) => {
+    const rawCode = (quickAccCode[envId] || '').trim();
+    const qty = quickAccQty[envId] || 1;
+    if (!rawCode) {
+      onShowToast('Digite ou selecione o código do acessório.', 'warning');
+      return;
+    }
+    const upperCode = rawCode.toUpperCase();
+    const name = lookupNameByCode(upperCode) || '';
+
+    const updated = [...currentOrder.environments];
+    if (!updated[envIdx].accessories) updated[envIdx].accessories = [];
+    updated[envIdx].accessories.push({
+      code: upperCode,
+      name: name,
+      quantity: Math.max(1, qty)
+    });
+
+    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    setHasUnsavedChanges(true);
+    setQuickAccCode(prev => ({ ...prev, [envId]: '' }));
+    setQuickAccQty(prev => ({ ...prev, [envId]: 1 }));
+    onShowToast(`Adicionado aos Acessórios: ${qty}x [${upperCode}] ${name || 'item'}`, 'success');
   };
 
   const handleRemoveAccessory = (envIdx: number, aIdx: number) => {
@@ -303,6 +405,13 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   const handleAccessoryNameChange = (envIdx: number, aIdx: number, name: string) => {
     const updated = [...currentOrder.environments];
     updated[envIdx].accessories[aIdx].name = name;
+    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleAccessoryQtyChange = (envIdx: number, aIdx: number, qty: number) => {
+    const updated = [...currentOrder.environments];
+    updated[envIdx].accessories[aIdx].quantity = Math.max(1, qty || 1);
     setCurrentOrder(prev => ({ ...prev, environments: updated }));
     setHasUnsavedChanges(true);
   };
@@ -541,7 +650,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
               Especificações Técnicas por Ambiente
             </h3>
             <p className="text-xs text-slate-500">
-              Digite o código da peça para preencher automaticamente com os dados do catálogo
+              Cadastre e configure máquinas, quadro de comando e acessórios com suas respectivas quantidades
             </p>
           </div>
 
@@ -703,7 +812,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                     <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                         <Fan className="w-4 h-4 text-blue-600" />
-                        <span>Máquinas & Quantidades</span>
+                        <span>Máquinas & Componentes</span>
                       </h4>
                       <button
                         type="button"
@@ -711,44 +820,65 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                         className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-blue-50 text-blue-700 border border-slate-200 rounded-lg transition flex items-center gap-1 shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Add Máquina</span>
+                        <span>+ Nova Máquina</span>
                       </button>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                       {(!env.machines || env.machines.length === 0) ? (
                         <p className="text-xs text-slate-400 italic">Nenhuma máquina cadastrada neste ambiente.</p>
                       ) : (
                         env.machines.map((machine, mIdx) => (
                           <div
                             key={machine.id || mIdx}
-                            className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs space-y-3"
+                            className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs space-y-4"
                           >
-                            <div className="flex flex-col sm:flex-row items-center gap-2">
-                              <div className="flex items-center gap-1 w-full sm:w-auto">
-                                <span className="text-[11px] font-semibold text-slate-500 uppercase sm:hidden">Qtd:</span>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={machine.quantity || 1}
-                                  onChange={e => handleUpdateMachine(envIdx, mIdx, 'quantity', parseInt(e.target.value) || 1)}
-                                  title="Quantidade de máquinas deste modelo"
-                                  className="w-20 border border-slate-300 rounded-lg p-1.5 text-sm font-bold text-center focus:ring-2 focus:ring-blue-500"
-                                />
+                            {/* Machine Header Row: Model & Machine Quantity */}
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 bg-slate-50/80 p-3 rounded-lg border border-slate-200">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-bold text-slate-500 uppercase">Qtd Máquinas:</span>
+                                <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateMachine(envIdx, mIdx, 'quantity', Math.max(1, (machine.quantity || 1) - 1))}
+                                    className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition"
+                                    title="Diminuir quantidade de máquinas"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={machine.quantity || 1}
+                                    onChange={e => handleUpdateMachine(envIdx, mIdx, 'quantity', parseInt(e.target.value) || 1)}
+                                    title="Quantidade de máquinas deste modelo"
+                                    className="w-12 border-x border-slate-200 p-1 text-sm font-bold text-center text-slate-900 focus:outline-none focus:bg-blue-50"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateMachine(envIdx, mIdx, 'quantity', (machine.quantity || 1) + 1)}
+                                    className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition"
+                                    title="Aumentar quantidade de máquinas"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
                               </div>
 
-                              <input
-                                type="text"
-                                value={machine.name}
-                                onChange={e => handleUpdateMachine(envIdx, mIdx, 'name', e.target.value)}
-                                placeholder="Modelo / Descrição da Máquina (ex: Chiller 5TR, Evaporador Teto)"
-                                className="flex-grow border border-slate-300 rounded-lg p-1.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 w-full"
-                              />
+                              <div className="flex-grow w-full">
+                                <input
+                                  type="text"
+                                  value={machine.name}
+                                  onChange={e => handleUpdateMachine(envIdx, mIdx, 'name', e.target.value)}
+                                  placeholder="Modelo / Descrição da Máquina (ex: Chiller 5TR, Evaporador Teto)"
+                                  className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                />
+                              </div>
 
                               <button
                                 type="button"
                                 onClick={() => handleRemoveMachine(envIdx, mIdx)}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition self-end sm:self-center"
                                 title="Remover Máquina"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -756,77 +886,182 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                             </div>
 
                             {/* Machine Components Sub-List */}
-                            <div className="pl-3 sm:pl-4 border-l-2 border-blue-200 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold text-slate-500 uppercase">
-                                  Componentes da Máquina (Código / Descrição):
-                                </span>
+                            <div className="pl-2 sm:pl-4 border-l-2 border-blue-400 space-y-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div>
+                                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                                    Componentes da Máquina
+                                  </span>
+                                  <span className="text-[11px] text-slate-500 block">
+                                    Adicione cada peça com sua quantidade específica por máquina
+                                  </span>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => handleAddMachineItem(envIdx, mIdx)}
-                                  className="text-[11px] text-blue-600 font-bold hover:underline flex items-center gap-1"
+                                  className="text-xs text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 self-start sm:self-auto"
                                 >
-                                  <Plus className="w-3 h-3" />
-                                  <span>Add Item</span>
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>+ Linha de Componente</span>
                                 </button>
                               </div>
 
-                              <div className="space-y-2">
-                                {(machine.items || []).map((item, iIdx) => {
-                                  const isInCatalog = catalog.some(c => c.code.toUpperCase() === (item.code || '').trim().toUpperCase());
+                              {/* Quick Add Bar with Quantity for Machine */}
+                              <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
+                                <span className="text-[11px] font-bold text-blue-900 uppercase">Adicionar Rápido:</span>
+                                
+                                <div className="w-40 sm:w-48 flex-grow">
+                                  <input
+                                    type="text"
+                                    list="catalogDatalist"
+                                    value={quickMachineCode[machine.id] || ''}
+                                    onChange={e => setQuickMachineCode(prev => ({ ...prev, [machine.id]: e.target.value }))}
+                                    placeholder="Código (ex: COMP-01)"
+                                    className="w-full border border-blue-300 rounded-lg px-2.5 py-1 text-xs font-bold uppercase text-blue-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                </div>
 
-                                  return (
-                                    <div
-                                      key={iIdx}
-                                      className="flex items-center gap-2 bg-slate-50 border border-slate-200 p-1.5 rounded-lg"
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[11px] font-bold text-blue-900">Qtd:</span>
+                                  <div className="flex items-center border border-blue-300 rounded-lg bg-white overflow-hidden shadow-xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => setQuickMachineQty(prev => ({ ...prev, [machine.id]: Math.max(1, (prev[machine.id] || 1) - 1) }))}
+                                      className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
                                     >
-                                      {/* Code Input */}
-                                      <div className="w-36 sm:w-44 flex-shrink-0">
-                                        <input
-                                          type="text"
-                                          list="catalogDatalist"
-                                          value={item.code}
-                                          onChange={e => handleMachineItemCodeChange(envIdx, mIdx, iIdx, e.target.value)}
-                                          placeholder="Código (ex: COMP-01)"
-                                          className="w-full border border-slate-300 rounded p-1 text-xs font-bold uppercase text-blue-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                      </div>
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={quickMachineQty[machine.id] ?? 1}
+                                      onChange={e => setQuickMachineQty(prev => ({ ...prev, [machine.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                      className="w-10 border-x border-blue-200 py-0.5 text-xs font-bold text-center text-slate-900 focus:outline-none"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setQuickMachineQty(prev => ({ ...prev, [machine.id]: (prev[machine.id] || 1) + 1 }))}
+                                      className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
 
-                                      {/* Description Input */}
-                                      <div className="flex-grow">
-                                        <input
-                                          type="text"
-                                          value={item.name}
-                                          onChange={e => handleMachineItemNameChange(envIdx, mIdx, iIdx, e.target.value)}
-                                          placeholder="Descrição da peça ou componente"
-                                          className="w-full border border-slate-200 bg-white rounded p-1 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                        />
-                                      </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickAddMachineItem(envIdx, mIdx, machine.id)}
+                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Adicionar</span>
+                                </button>
+                              </div>
 
-                                      {/* Quick Save to Catalog button if code exists and is not yet in catalog */}
-                                      {item.code && item.name && !isInCatalog && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleQuickSaveCatalog(item.code, item.name)}
-                                          className="px-2 py-0.5 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 rounded font-semibold transition flex items-center gap-1 flex-shrink-0"
-                                          title="Salvar este código e nome no catálogo geral"
-                                        >
-                                          <Sparkles className="w-3 h-3 text-amber-600" />
-                                          <span className="hidden sm:inline">+ Catálogo</span>
-                                        </button>
-                                      )}
+                              {/* Components Table Headers */}
+                              {machine.items && machine.items.length > 0 && (
+                                <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  <div className="col-span-3">Código (Ref)</div>
+                                  <div className="col-span-5">Descrição do Componente</div>
+                                  <div className="col-span-3 text-center">Quantidade (Qtd)</div>
+                                  <div className="col-span-1 text-right">Ação</div>
+                                </div>
+                              )}
 
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveMachineItem(envIdx, mIdx, iIdx)}
-                                        className="p-1 text-slate-400 hover:text-red-500 rounded transition flex-shrink-0"
-                                        title="Remover Item"
+                              {/* Components Rows */}
+                              <div className="space-y-2">
+                                {(!machine.items || machine.items.length === 0) ? (
+                                  <p className="text-xs text-slate-400 italic py-1">Nenhum componente cadastrado para esta máquina.</p>
+                                ) : (
+                                  machine.items.map((item, iIdx) => {
+                                    const isInCatalog = catalog.some(c => c.code.toUpperCase() === (item.code || '').trim().toUpperCase());
+
+                                    return (
+                                      <div
+                                        key={iIdx}
+                                        className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50/90 border border-slate-200 p-2 rounded-xl transition hover:border-slate-300"
                                       >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  );
-                                })}
+                                        {/* Code Input */}
+                                        <div className="w-full sm:w-36 md:w-44 flex-shrink-0">
+                                          <input
+                                            type="text"
+                                            list="catalogDatalist"
+                                            value={item.code}
+                                            onChange={e => handleMachineItemCodeChange(envIdx, mIdx, iIdx, e.target.value)}
+                                            placeholder="Código (ex: COMP-01)"
+                                            className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold uppercase text-blue-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                          />
+                                        </div>
+
+                                        {/* Description Input */}
+                                        <div className="flex-grow">
+                                          <input
+                                            type="text"
+                                            value={item.name}
+                                            onChange={e => handleMachineItemNameChange(envIdx, mIdx, iIdx, e.target.value)}
+                                            placeholder="Descrição da peça ou componente"
+                                            className="w-full border border-slate-200 bg-white rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                          />
+                                        </div>
+
+                                        {/* Quantity Stepper Input */}
+                                        <div className="flex items-center justify-between sm:justify-start gap-1.5 flex-shrink-0">
+                                          <span className="text-[10px] font-bold text-slate-500 uppercase sm:hidden">Qtd:</span>
+                                          <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-xs">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleMachineItemQtyChange(envIdx, mIdx, iIdx, Math.max(1, (item.quantity || 1) - 1))}
+                                              className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
+                                              title="Diminuir quantidade"
+                                            >
+                                              <Minus className="w-3 h-3" />
+                                            </button>
+                                            <input
+                                              type="number"
+                                              min="1"
+                                              value={item.quantity ?? 1}
+                                              onChange={e => handleMachineItemQtyChange(envIdx, mIdx, iIdx, parseInt(e.target.value) || 1)}
+                                              title="Quantidade do componente"
+                                              className="w-12 text-center text-xs font-bold text-slate-900 border-x border-slate-200 py-1 focus:outline-none focus:bg-blue-50"
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={() => handleMachineItemQtyChange(envIdx, mIdx, iIdx, (item.quantity || 1) + 1)}
+                                              className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
+                                              title="Aumentar quantidade"
+                                            >
+                                              <Plus className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="flex items-center gap-1 justify-end flex-shrink-0">
+                                          {item.code && item.name && !isInCatalog && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleQuickSaveCatalog(item.code, item.name)}
+                                              className="px-2 py-1 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-semibold transition flex items-center gap-1 flex-shrink-0"
+                                              title="Salvar este código e nome no catálogo geral"
+                                            >
+                                              <Sparkles className="w-3 h-3 text-amber-600" />
+                                              <span className="hidden md:inline">+ Catálogo</span>
+                                            </button>
+                                          )}
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveMachineItem(envIdx, mIdx, iIdx)}
+                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                            title="Remover Item"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                )}
                               </div>
                             </div>
                           </div>
@@ -842,9 +1077,9 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                       <span>Quadro de Comando do Ambiente</span>
                     </h4>
 
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
                           Especificação Geral do Quadro
                         </label>
                         <input
@@ -856,74 +1091,182 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                         />
                       </div>
 
-                      <div className="bg-white border border-slate-200 p-3.5 rounded-xl space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-600 uppercase">
-                            Componentes do Quadro (Código / Descrição):
-                          </span>
+                      <div className="bg-white border border-slate-200 p-4 rounded-xl space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                              Componentes do Quadro
+                            </span>
+                            <span className="text-[11px] text-slate-500 block">
+                              Disjuntores, contatores, relés, CLP, bornes com suas quantidades
+                            </span>
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleAddPanelItem(envIdx)}
-                            className="text-xs text-blue-600 font-bold hover:underline flex items-center gap-1"
+                            className="text-xs text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 self-start sm:self-auto"
                           >
-                            <Plus className="w-3 h-3" />
-                            <span>Add Componente</span>
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Linha de Componente</span>
                           </button>
                         </div>
 
-                        <div className="space-y-2">
-                          {(env.panel?.items || []).map((pItem, pIdx) => {
-                            const isInCatalog = catalog.some(c => c.code.toUpperCase() === (pItem.code || '').trim().toUpperCase());
+                        {/* Quick Add Bar with Quantity for Panel */}
+                        <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-bold text-amber-900 uppercase">Adicionar Rápido:</span>
+                          
+                          <div className="w-40 sm:w-48 flex-grow">
+                            <input
+                              type="text"
+                              list="catalogDatalist"
+                              value={quickPanelCode[env.id] || ''}
+                              onChange={e => setQuickPanelCode(prev => ({ ...prev, [env.id]: e.target.value }))}
+                              placeholder="Código (ex: DISJ-32)"
+                              className="w-full border border-amber-300 rounded-lg px-2.5 py-1 text-xs font-bold uppercase text-amber-900 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                          </div>
 
-                            return (
-                              <div
-                                key={pIdx}
-                                className="flex items-center gap-2 bg-slate-50 border border-slate-200 p-1.5 rounded-lg"
+                          <div className="flex items-center gap-1">
+                            <span className="text-[11px] font-bold text-amber-900">Qtd:</span>
+                            <div className="flex items-center border border-amber-300 rounded-lg bg-white overflow-hidden shadow-xs">
+                              <button
+                                type="button"
+                                onClick={() => setQuickPanelQty(prev => ({ ...prev, [env.id]: Math.max(1, (prev[env.id] || 1) - 1) }))}
+                                className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
                               >
-                                <div className="w-36 sm:w-44 flex-shrink-0">
-                                  <input
-                                    type="text"
-                                    list="catalogDatalist"
-                                    value={pItem.code}
-                                    onChange={e => handlePanelItemCodeChange(envIdx, pIdx, e.target.value)}
-                                    placeholder="Código (ex: DISJ-32)"
-                                    className="w-full border border-slate-300 rounded p-1 text-xs font-bold uppercase text-amber-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                  />
-                                </div>
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={quickPanelQty[env.id] ?? 1}
+                                onChange={e => setQuickPanelQty(prev => ({ ...prev, [env.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                className="w-10 border-x border-amber-200 py-0.5 text-xs font-bold text-center text-slate-900 focus:outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setQuickPanelQty(prev => ({ ...prev, [env.id]: (prev[env.id] || 1) + 1 }))}
+                                className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
 
-                                <div className="flex-grow">
-                                  <input
-                                    type="text"
-                                    value={pItem.name}
-                                    onChange={e => handlePanelItemNameChange(envIdx, pIdx, e.target.value)}
-                                    placeholder="Descrição do componente elétrico"
-                                    className="w-full border border-slate-200 bg-white rounded p-1 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                  />
-                                </div>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAddPanelItem(envIdx, env.id)}
+                            className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Adicionar ao Quadro</span>
+                          </button>
+                        </div>
 
-                                {pItem.code && pItem.name && !isInCatalog && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleQuickSaveCatalog(pItem.code, pItem.name)}
-                                    className="px-2 py-0.5 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 rounded font-semibold transition flex items-center gap-1 flex-shrink-0"
-                                    title="Salvar este código e nome no catálogo geral"
-                                  >
-                                    <Sparkles className="w-3 h-3 text-amber-600" />
-                                    <span className="hidden sm:inline">+ Catálogo</span>
-                                  </button>
-                                )}
+                        {/* Panel Table Headers */}
+                        {env.panel?.items && env.panel.items.length > 0 && (
+                          <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                            <div className="col-span-3">Código (Ref)</div>
+                            <div className="col-span-5">Descrição do Componente Elétrico</div>
+                            <div className="col-span-3 text-center">Quantidade (Qtd)</div>
+                            <div className="col-span-1 text-right">Ação</div>
+                          </div>
+                        )}
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemovePanelItem(envIdx, pIdx)}
-                                  className="p-1 text-slate-400 hover:text-red-500 rounded transition flex-shrink-0"
-                                  title="Remover Componente"
+                        {/* Panel Items Rows */}
+                        <div className="space-y-2">
+                          {(!env.panel?.items || env.panel.items.length === 0) ? (
+                            <p className="text-xs text-slate-400 italic py-1">Nenhum componente elétrico cadastrado para este quadro.</p>
+                          ) : (
+                            env.panel.items.map((pItem, pIdx) => {
+                              const isInCatalog = catalog.some(c => c.code.toUpperCase() === (pItem.code || '').trim().toUpperCase());
+
+                              return (
+                                <div
+                                  key={pIdx}
+                                  className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50/90 border border-slate-200 p-2 rounded-xl transition hover:border-slate-300"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            );
-                          })}
+                                  {/* Code Input */}
+                                  <div className="w-full sm:w-36 md:w-44 flex-shrink-0">
+                                    <input
+                                      type="text"
+                                      list="catalogDatalist"
+                                      value={pItem.code}
+                                      onChange={e => handlePanelItemCodeChange(envIdx, pIdx, e.target.value)}
+                                      placeholder="Código (ex: DISJ-32)"
+                                      className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold uppercase text-amber-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    />
+                                  </div>
+
+                                  {/* Description Input */}
+                                  <div className="flex-grow">
+                                    <input
+                                      type="text"
+                                      value={pItem.name}
+                                      onChange={e => handlePanelItemNameChange(envIdx, pIdx, e.target.value)}
+                                      placeholder="Descrição do componente elétrico"
+                                      className="w-full border border-slate-200 bg-white rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    />
+                                  </div>
+
+                                  {/* Quantity Stepper Input */}
+                                  <div className="flex items-center justify-between sm:justify-start gap-1.5 flex-shrink-0">
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase sm:hidden">Qtd:</span>
+                                    <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-xs">
+                                      <button
+                                        type="button"
+                                        onClick={() => handlePanelItemQtyChange(envIdx, pIdx, Math.max(1, (pItem.quantity || 1) - 1))}
+                                        className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
+                                        title="Diminuir quantidade"
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={pItem.quantity ?? 1}
+                                        onChange={e => handlePanelItemQtyChange(envIdx, pIdx, parseInt(e.target.value) || 1)}
+                                        title="Quantidade do componente"
+                                        className="w-12 text-center text-xs font-bold text-slate-900 border-x border-slate-200 py-1 focus:outline-none focus:bg-amber-50"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handlePanelItemQtyChange(envIdx, pIdx, (pItem.quantity || 1) + 1)}
+                                        className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
+                                        title="Aumentar quantidade"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Actions */}
+                                  <div className="flex items-center gap-1 justify-end flex-shrink-0">
+                                    {pItem.code && pItem.name && !isInCatalog && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuickSaveCatalog(pItem.code, pItem.name)}
+                                        className="px-2 py-1 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-semibold transition flex items-center gap-1 flex-shrink-0"
+                                        title="Salvar este código e nome no catálogo geral"
+                                      >
+                                        <Sparkles className="w-3 h-3 text-amber-600" />
+                                        <span className="hidden md:inline">+ Catálogo</span>
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemovePanelItem(envIdx, pIdx)}
+                                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                      title="Remover Componente"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
                         </div>
                       </div>
                     </div>
@@ -942,63 +1285,168 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                         className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-emerald-50 text-emerald-700 border border-slate-200 rounded-lg transition flex items-center gap-1 shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Add Acessório</span>
+                        <span>+ Linha de Acessório</span>
                       </button>
                     </div>
 
-                    <div className="space-y-2">
-                      {(env.accessories || []).map((acc, aIdx) => {
-                        const isInCatalog = catalog.some(c => c.code.toUpperCase() === (acc.code || '').trim().toUpperCase());
+                    <div className="space-y-3">
+                      {/* Quick Add Bar with Quantity for Accessories */}
+                      <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-bold text-emerald-900 uppercase">Adicionar Rápido:</span>
+                        
+                        <div className="w-40 sm:w-48 flex-grow">
+                          <input
+                            type="text"
+                            list="catalogDatalist"
+                            value={quickAccCode[env.id] || ''}
+                            onChange={e => setQuickAccCode(prev => ({ ...prev, [env.id]: e.target.value }))}
+                            placeholder="Código (ex: SENS-NTC)"
+                            className="w-full border border-emerald-300 rounded-lg px-2.5 py-1 text-xs font-bold uppercase text-emerald-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
 
-                        return (
-                          <div
-                            key={aIdx}
-                            className="flex items-center gap-2 bg-white border border-slate-200 p-1.5 rounded-lg"
-                          >
-                            <div className="w-36 sm:w-44 flex-shrink-0">
-                              <input
-                                type="text"
-                                list="catalogDatalist"
-                                value={acc.code}
-                                onChange={e => handleAccessoryCodeChange(envIdx, aIdx, e.target.value)}
-                                placeholder="Código (ex: SENS-NTC)"
-                                className="w-full border border-slate-300 rounded p-1 text-xs font-bold uppercase text-emerald-700 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                              />
-                            </div>
-
-                            <div className="flex-grow">
-                              <input
-                                type="text"
-                                value={acc.name}
-                                onChange={e => handleAccessoryNameChange(envIdx, aIdx, e.target.value)}
-                                placeholder="Descrição do acessório ou periférico"
-                                className="w-full border border-slate-200 bg-slate-50 focus:bg-white rounded p-1 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                              />
-                            </div>
-
-                            {acc.code && acc.name && !isInCatalog && (
-                              <button
-                                type="button"
-                                onClick={() => handleQuickSaveCatalog(acc.code, acc.name)}
-                                className="px-2 py-0.5 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 rounded font-semibold transition flex items-center gap-1 flex-shrink-0"
-                                title="Salvar este código e nome no catálogo geral"
-                              >
-                                <Sparkles className="w-3 h-3 text-amber-600" />
-                                <span className="hidden sm:inline">+ Catálogo</span>
-                              </button>
-                            )}
-
+                        <div className="flex items-center gap-1">
+                          <span className="text-[11px] font-bold text-emerald-900">Qtd:</span>
+                          <div className="flex items-center border border-emerald-300 rounded-lg bg-white overflow-hidden shadow-xs">
                             <button
                               type="button"
-                              onClick={() => handleRemoveAccessory(envIdx, aIdx)}
-                              className="p-1 text-slate-400 hover:text-red-500 rounded transition flex-shrink-0"
-                              title="Remover Acessório"
+                              onClick={() => setQuickAccQty(prev => ({ ...prev, [env.id]: Math.max(1, (prev[env.id] || 1) - 1) }))}
+                              className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              value={quickAccQty[env.id] ?? 1}
+                              onChange={e => setQuickAccQty(prev => ({ ...prev, [env.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
+                              className="w-10 border-x border-emerald-200 py-0.5 text-xs font-bold text-center text-slate-900 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setQuickAccQty(prev => ({ ...prev, [env.id]: (prev[env.id] || 1) + 1 }))}
+                              className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
+                            >
+                              +
                             </button>
                           </div>
-                        );
-                      })}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAddAccessory(envIdx, env.id)}
+                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Adicionar Acessório</span>
+                        </button>
+                      </div>
+
+                      {/* Accessories Table Headers */}
+                      {env.accessories && env.accessories.length > 0 && (
+                        <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          <div className="col-span-3">Código (Ref)</div>
+                          <div className="col-span-5">Descrição do Acessório / Periférico</div>
+                          <div className="col-span-3 text-center">Quantidade (Qtd)</div>
+                          <div className="col-span-1 text-right">Ação</div>
+                        </div>
+                      )}
+
+                      {/* Accessories Rows */}
+                      <div className="space-y-2">
+                        {(!env.accessories || env.accessories.length === 0) ? (
+                          <p className="text-xs text-slate-400 italic py-1">Nenhum acessório adicional cadastrado para este ambiente.</p>
+                        ) : (
+                          env.accessories.map((acc, aIdx) => {
+                            const isInCatalog = catalog.some(c => c.code.toUpperCase() === (acc.code || '').trim().toUpperCase());
+
+                            return (
+                              <div
+                                key={aIdx}
+                                className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white border border-slate-200 p-2 rounded-xl transition hover:border-slate-300"
+                              >
+                                {/* Code Input */}
+                                <div className="w-full sm:w-36 md:w-44 flex-shrink-0">
+                                  <input
+                                    type="text"
+                                    list="catalogDatalist"
+                                    value={acc.code}
+                                    onChange={e => handleAccessoryCodeChange(envIdx, aIdx, e.target.value)}
+                                    placeholder="Código (ex: SENS-NTC)"
+                                    className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold uppercase text-emerald-700 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                  />
+                                </div>
+
+                                {/* Description Input */}
+                                <div className="flex-grow">
+                                  <input
+                                    type="text"
+                                    value={acc.name}
+                                    onChange={e => handleAccessoryNameChange(envIdx, aIdx, e.target.value)}
+                                    placeholder="Descrição do acessório ou periférico"
+                                    className="w-full border border-slate-200 bg-slate-50 focus:bg-white rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                  />
+                                </div>
+
+                                {/* Quantity Stepper Input */}
+                                <div className="flex items-center justify-between sm:justify-start gap-1.5 flex-shrink-0">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase sm:hidden">Qtd:</span>
+                                  <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAccessoryQtyChange(envIdx, aIdx, Math.max(1, (acc.quantity || 1) - 1))}
+                                      className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
+                                      title="Diminuir quantidade"
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={acc.quantity ?? 1}
+                                      onChange={e => handleAccessoryQtyChange(envIdx, aIdx, parseInt(e.target.value) || 1)}
+                                      title="Quantidade do acessório"
+                                      className="w-12 text-center text-xs font-bold text-slate-900 border-x border-slate-200 py-1 focus:outline-none focus:bg-emerald-50"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAccessoryQtyChange(envIdx, aIdx, (acc.quantity || 1) + 1)}
+                                      className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
+                                      title="Aumentar quantidade"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-1 justify-end flex-shrink-0">
+                                  {acc.code && acc.name && !isInCatalog && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickSaveCatalog(acc.code, acc.name)}
+                                      className="px-2 py-1 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-semibold transition flex items-center gap-1 flex-shrink-0"
+                                      title="Salvar este código e nome no catálogo geral"
+                                    >
+                                      <Sparkles className="w-3 h-3 text-amber-600" />
+                                      <span className="hidden md:inline">+ Catálogo</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveAccessory(envIdx, aIdx)}
+                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                    title="Remover Acessório"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1008,6 +1456,15 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Datalist for autocomplete on all code inputs */}
+      <datalist id="catalogDatalist">
+        {catalog.map((c, idx) => (
+          <option key={`${c.code}-${idx}`} value={c.code}>
+            {c.name} ({c.category || 'Geral'})
+          </option>
+        ))}
+      </datalist>
 
     </div>
   );

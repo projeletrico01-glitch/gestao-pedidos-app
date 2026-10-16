@@ -382,7 +382,8 @@ export function exportOrdersToExcel(orders: Order[]) {
           'Seção': 'Máquina',
           'Identificação / Item': `${m.quantity}x ${m.name}`,
           'Código': '',
-          'Descrição Componente': m.items?.map(i => `${i.code ? `[${i.code}] ` : ''}${i.name}`).join('; ') || ''
+          'Quantidade': m.quantity || 1,
+          'Descrição Componente': m.items?.map(i => `${i.quantity ? `${i.quantity}x ` : '1x '}${i.code ? `[${i.code}] ` : ''}${i.name}`).join('; ') || ''
         });
       });
 
@@ -395,7 +396,8 @@ export function exportOrdersToExcel(orders: Order[]) {
           'Seção': 'Quadro de Comando',
           'Identificação / Item': env.panel.description || 'Quadro elétrico',
           'Código': '',
-          'Descrição Componente': env.panel.items?.map(i => `${i.code ? `[${i.code}] ` : ''}${i.name}`).join('; ') || ''
+          'Quantidade': 1,
+          'Descrição Componente': env.panel.items?.map(i => `${i.quantity ? `${i.quantity}x ` : '1x '}${i.code ? `[${i.code}] ` : ''}${i.name}`).join('; ') || ''
         });
       }
 
@@ -408,7 +410,8 @@ export function exportOrdersToExcel(orders: Order[]) {
           'Seção': 'Acessório',
           'Identificação / Item': 'Acessório Periférico',
           'Código': acc.code || '',
-          'Descrição Componente': acc.name || ''
+          'Quantidade': acc.quantity || 1,
+          'Descrição Componente': `${acc.quantity ? `${acc.quantity}x ` : '1x '}${acc.name || ''}`
         });
       });
     });

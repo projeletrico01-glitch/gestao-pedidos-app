@@ -57,23 +57,23 @@ export const initialOrdersData: Order[] = [
             name: 'Chiller de Precisão 5TR',
             quantity: 1,
             items: [
-              { code: 'COMP-01', name: 'Compressor Scroll 5HP R410A 220V' },
-              { code: 'VALV-EXP', name: 'Válvula de Expansão Eletrônica 3/8"' }
+              { code: 'COMP-01', name: 'Compressor Scroll 5HP R410A 220V', quantity: 1 },
+              { code: 'VALV-EXP', name: 'Válvula de Expansão Eletrônica 3/8"', quantity: 1 }
             ]
           }
         ],
         panel: {
           description: 'Quadro Trifásico 380V c/ CLP Siemens e Partida Suave',
           items: [
-            { code: 'DISJ-32', name: 'Disjuntor Trifásico DIN 32A Curva C' },
-            { code: 'CONT-32', name: 'Contator Trifásico 32A 220V (1NA+1NF)' },
-            { code: 'INV-7.5', name: 'Inversor de Frequência 7.5HP 380V Trifásico' },
-            { code: 'CLP-01', name: 'Módulo CLP Siemens S7-1200 CPU 1214C' }
+            { code: 'DISJ-32', name: 'Disjuntor Trifásico DIN 32A Curva C', quantity: 1 },
+            { code: 'CONT-32', name: 'Contator Trifásico 32A 220V (1NA+1NF)', quantity: 2 },
+            { code: 'INV-7.5', name: 'Inversor de Frequência 7.5HP 380V Trifásico', quantity: 1 },
+            { code: 'CLP-01', name: 'Módulo CLP Siemens S7-1200 CPU 1214C', quantity: 1 }
           ]
         },
         accessories: [
-          { code: 'SENS-NTC', name: 'Sensor de Temperatura NTC 10k 1.5m Inox' },
-          { code: 'FILT-G4', name: 'Filtro de Ar Lavável G4 500x500mm' }
+          { code: 'SENS-NTC', name: 'Sensor de Temperatura NTC 10k 1.5m Inox', quantity: 2 },
+          { code: 'FILT-G4', name: 'Filtro de Ar Lavável G4 500x500mm', quantity: 4 }
         ]
       },
       {
@@ -85,20 +85,20 @@ export const initialOrdersData: Order[] = [
             name: 'Fan Coil Hidrônico 3TR',
             quantity: 2,
             items: [
-              { code: 'VALV-3V', name: 'Válvula de 3 Vias Motorizada Proporcional 3/4"' },
-              { code: 'FILT-G4', name: 'Filtro de Ar Lavável G4 500x500mm' }
+              { code: 'VALV-3V', name: 'Válvula de 3 Vias Motorizada Proporcional 3/4"', quantity: 2 },
+              { code: 'FILT-G4', name: 'Filtro de Ar Lavável G4 500x500mm', quantity: 2 }
             ]
           }
         ],
         panel: {
           description: 'Painel de Comando Secundário 220V',
           items: [
-            { code: 'DISJ-16', name: 'Disjuntor Bipolar DIN 16A Curva C' },
-            { code: 'CONT-09', name: 'Contator Trifásico 9A 220V (1NA)' }
+            { code: 'DISJ-16', name: 'Disjuntor Bipolar DIN 16A Curva C', quantity: 2 },
+            { code: 'CONT-09', name: 'Contator Trifásico 9A 220V (1NA)', quantity: 2 }
           ]
         },
         accessories: [
-          { code: 'SENS-PT100', name: 'Transmissor de Temperatura PT100 4-20mA' }
+          { code: 'SENS-PT100', name: 'Transmissor de Temperatura PT100 4-20mA', quantity: 1 }
         ]
       }
     ]
@@ -122,22 +122,22 @@ export const initialOrdersData: Order[] = [
             name: 'Unidade Condensadora 10HP R404A',
             quantity: 1,
             items: [
-              { code: 'COMP-03', name: 'Compressor Semi-Hermético 10HP 380V' },
-              { code: 'TRANSD-P', name: 'Transdutor de Pressão 0-500 PSI 4-20mA' }
+              { code: 'COMP-03', name: 'Compressor Semi-Hermético 10HP 380V', quantity: 1 },
+              { code: 'TRANSD-P', name: 'Transdutor de Pressão 0-500 PSI 4-20mA', quantity: 2 }
             ]
           }
         ],
         panel: {
           description: 'Quadro Elétrico Autônomo com IHM 7" e Alarme Sonoro',
           items: [
-            { code: 'QUADRO-MET', name: 'Quadro Metálico Sobrepor 600x400x250mm IP65' },
-            { code: 'DISJ-63', name: 'Disjuntor Caixa Moldada 63A 3P' },
-            { code: 'SOFT-15', name: 'Soft-Starter 15CV 380V c/ Bypass' },
-            { code: 'IHM-07', name: 'IHM Touch Screen Colorida 7" Ethernet' }
+            { code: 'QUADRO-MET', name: 'Quadro Metálico Sobrepor 600x400x250mm IP65', quantity: 1 },
+            { code: 'DISJ-63', name: 'Disjuntor Caixa Moldada 63A 3P', quantity: 1 },
+            { code: 'SOFT-15', name: 'Soft-Starter 15CV 380V c/ Bypass', quantity: 1 },
+            { code: 'IHM-07', name: 'IHM Touch Screen Colorida 7" Ethernet', quantity: 1 }
           ]
         },
         accessories: [
-          { code: 'SENS-PT100', name: 'Transmissor de Temperatura PT100 4-20mA' }
+          { code: 'SENS-PT100', name: 'Transmissor de Temperatura PT100 4-20mA', quantity: 2 }
         ]
       }
     ]
@@ -161,19 +161,19 @@ export const initialOrdersData: Order[] = [
             name: 'Evaporador de Teto Duplo Fluxo',
             quantity: 2,
             items: [
-              { code: 'COMP-02', name: 'Compressor Hermético 3HP R404A 220V' }
+              { code: 'COMP-02', name: 'Compressor Hermético 3HP R404A 220V', quantity: 1 }
             ]
           }
         ],
         panel: {
           description: 'Quadro de Degelo Elétrico',
           items: [
-            { code: 'DISJ-25', name: 'Disjuntor Bipolar DIN 25A Curva C' },
-            { code: 'CONT-18', name: 'Contator Trifásico 18A 220V (1NA)' }
+            { code: 'DISJ-25', name: 'Disjuntor Bipolar DIN 25A Curva C', quantity: 2 },
+            { code: 'CONT-18', name: 'Contator Trifásico 18A 220V (1NA)', quantity: 2 }
           ]
         },
         accessories: [
-          { code: 'SENS-NTC', name: 'Sensor de Temperatura NTC 10k 1.5m Inox' }
+          { code: 'SENS-NTC', name: 'Sensor de Temperatura NTC 10k 1.5m Inox', quantity: 2 }
         ]
       }
     ]

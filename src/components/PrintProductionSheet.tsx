@@ -1,3 +1,4 @@
+import React from 'react';
 import { Order } from '../types';
 import { formatDateBR, calculateRemainingDays } from '../utils/excel';
 import { TermoprolLogo } from './TermoprolLogo';
@@ -88,6 +89,9 @@ export const PrintProductionSheet: React.FC<PrintProductionSheetProps> = ({ orde
                             {m.items.map((it, iIdx) => (
                               <div key={iIdx} className="text-[11px] flex items-center justify-between">
                                 <span>
+                                  <span className="inline-block bg-gray-100 border border-gray-300 font-bold px-1.5 py-0.5 rounded text-[10px] mr-1.5">
+                                    {it.quantity || 1}x
+                                  </span>
                                   {it.code ? <strong className="font-mono text-blue-900 mr-1.5">[{it.code}]</strong> : null}
                                   {it.name || 'Componente não especificado'}
                                 </span>
@@ -116,6 +120,9 @@ export const PrintProductionSheet: React.FC<PrintProductionSheetProps> = ({ orde
                       {env.panel.items.map((pItem, pIdx) => (
                         <div key={pIdx} className="text-[11px] flex items-center justify-between">
                           <span>
+                            <span className="inline-block bg-gray-100 border border-gray-300 font-bold px-1.5 py-0.5 rounded text-[10px] mr-1.5">
+                              {pItem.quantity || 1}x
+                            </span>
                             {pItem.code ? <strong className="font-mono text-blue-900 mr-1.5">[{pItem.code}]</strong> : null}
                             {pItem.name || 'Item'}
                           </span>
@@ -137,6 +144,9 @@ export const PrintProductionSheet: React.FC<PrintProductionSheetProps> = ({ orde
                     {env.accessories.map((acc, aIdx) => (
                       <div key={aIdx} className="text-[11px] flex items-center justify-between">
                         <span>
+                          <span className="inline-block bg-gray-100 border border-gray-300 font-bold px-1.5 py-0.5 rounded text-[10px] mr-1.5">
+                            {acc.quantity || 1}x
+                          </span>
                           {acc.code ? <strong className="font-mono text-blue-900 mr-1.5">[{acc.code}]</strong> : null}
                           {acc.name || 'Acessório'}
                         </span>
