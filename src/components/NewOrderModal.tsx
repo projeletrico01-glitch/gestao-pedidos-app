@@ -17,6 +17,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   const [orderNumber, setOrderNumber] = useState(`PV-${Math.floor(1000 + Math.random() * 9000)}`);
   const [customer, setCustomer] = useState('');
   const [appSheet, setAppSheet] = useState<'SIM' | 'NÃO'>('NÃO');
+  const [supervisory, setSupervisory] = useState<'SIM' | 'NÃO'>('NÃO');
   const [deliveryDate, setDeliveryDate] = useState(getRelativeDate(7));
   const [notes, setNotes] = useState('');
 
@@ -31,6 +32,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
       orderNumber: orderNumber.trim(),
       customer: customer.trim(),
       appSheet,
+      supervisory,
       status: 'Pendente',
       deliveryDate,
       notes: notes.trim(),
@@ -39,6 +41,8 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
         {
           id: 'env-' + Date.now(),
           name: 'Ambiente Principal',
+          operatingTemperature: '',
+          evaporatorDistance: '',
           machines: [],
           panel: { description: '', items: [] },
           accessories: []
@@ -126,18 +130,32 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                Data de Entrega *
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Supervisório
               </label>
-              <input
-                type="date"
-                required
-                value={deliveryDate}
-                onChange={e => setDeliveryDate(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
+              <select
+                value={supervisory}
+                onChange={e => setSupervisory(e.target.value as 'SIM' | 'NÃO')}
+                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="SIM">SIM (Com Supervisório)</option>
+                <option value="NÃO">NÃO (Sem Supervisório)</option>
+              </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              Data de Entrega *
+            </label>
+            <input
+              type="date"
+              required
+              value={deliveryDate}
+              onChange={e => setDeliveryDate(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg p-2 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
           </div>
 
           {/* Quick Date Shortcuts */}

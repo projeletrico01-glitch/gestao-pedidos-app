@@ -23,6 +23,8 @@ export interface PanelSpecification {
 export interface Environment {
   id: string;
   name: string;
+  operatingTemperature?: string; // Temperatura de operação (ex: -18°C, +2°C a +4°C)
+  evaporatorDistance?: string; // Distância da evaporadora para condensadora (ex: 15m)
   machines: Machine[];
   panel: PanelSpecification;
   accessories: CodeItem[];
@@ -33,6 +35,7 @@ export interface Order {
   orderNumber: string;
   customer: string;
   appSheet: 'SIM' | 'NÃO';
+  supervisory?: 'SIM' | 'NÃO'; // Configuração se possui supervisório
   status: OrderStatus;
   deliveryDate: string; // YYYY-MM-DD
   notes: string;

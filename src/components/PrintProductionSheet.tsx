@@ -25,7 +25,7 @@ export const PrintProductionSheet: React.FC<PrintProductionSheetProps> = ({ orde
       </div>
 
       {/* Order Info Summary */}
-      <div className="border border-gray-300 rounded p-4 mb-6 bg-gray-50 grid grid-cols-4 gap-4 text-xs">
+      <div className="border border-gray-300 rounded p-4 mb-6 bg-gray-50 grid grid-cols-5 gap-3 text-xs">
         <div>
           <span className="block font-bold text-gray-500 uppercase">Cliente / Empresa:</span>
           <span className="font-bold text-sm text-black">{order.customer}</span>
@@ -33,6 +33,12 @@ export const PrintProductionSheet: React.FC<PrintProductionSheetProps> = ({ orde
         <div>
           <span className="block font-bold text-gray-500 uppercase">AppSheet:</span>
           <span className="font-bold text-sm">{order.appSheet}</span>
+        </div>
+        <div>
+          <span className="block font-bold text-gray-500 uppercase">Supervisório:</span>
+          <span className={`font-bold text-sm ${order.supervisory === 'SIM' ? 'text-blue-900' : 'text-gray-700'}`}>
+            {order.supervisory || 'NÃO'}
+          </span>
         </div>
         <div>
           <span className="block font-bold text-gray-500 uppercase">Status Atual:</span>
@@ -43,7 +49,7 @@ export const PrintProductionSheet: React.FC<PrintProductionSheetProps> = ({ orde
           <span className="font-bold text-sm text-black">{formatDateBR(order.deliveryDate)} ({remaining.text})</span>
         </div>
         {order.notes && (
-          <div className="col-span-4 pt-2 border-t border-gray-200 mt-2">
+          <div className="col-span-5 pt-2 border-t border-gray-200 mt-2">
             <span className="font-bold text-gray-600">Observações: </span>
             <span>{order.notes}</span>
           </div>
@@ -59,16 +65,31 @@ export const PrintProductionSheet: React.FC<PrintProductionSheetProps> = ({ orde
         {(!order.environments || order.environments.length === 0) ? (
           <p className="text-xs text-gray-500 italic">Nenhum ambiente especificado para este pedido.</p>
         ) : (
-          order.environments.map((env, envIdx) => (
-            <div key={env.id} className="border border-gray-400 rounded-md p-4 print-break-inside-avoid">
-              <div className="bg-gray-100 p-2 -m-4 mb-3 border-b border-gray-300 flex justify-between items-center">
-                <span className="font-bold text-xs uppercase tracking-wide">
-                  Ambiente {envIdx + 1}: {env.name}
-                </span>
-                <span className="text-[10px] text-gray-500">
-                  {env.machines?.length || 0} máquinas
-                </span>
-              </div>
+          order.environments.map((env, envIdx) => {
+            const envMachineCount = env.machines?.reduce((acc, m) => acc + (Number(m.quantity) > 0 ? Number(m.quantity) : 1), 0) || 0;
+            return (
+              <div key={env.id} className="border border-gray-400 rounded-md p-4 print-break-inside-avoid">
+                <div className="bg-gray-100 p-2.5 -m-4 mb-3 border-b border-gray-300">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-bold text-xs uppercase tracking-wide text-black">
+                      Ambiente {envIdx + 1}: {env.name}
+                    </span>
+                    <span className="text-[10px] text-gray-700 font-bold bg-white px-2 py-0.5 rounded border border-gray-300">
+                      {envMachineCount} {envMachineCount === 1 ? 'máquina' : 'máquinas'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 text-[11px] text-gray-700 pt-1 border-t border-gray-200">
+                    <span>
+                      <strong>Temp. de Operação: </strong>
+                      <span className="font-mono font-bold text-blue-900">{env.operatingTemperature || 'Não informada'}</span>
+                    </span>
+                    <span>•</span>
+                    <span>
+                      <strong>Distância Evap → Cond: </strong>
+                      <span className="font-mono font-bold text-amber-900">{env.evaporatorDistance || 'Não informada'}</span>
+                    </span>
+                  </div>
+                </div>
 
               {/* Machines */}
               <div className="mb-4">
@@ -158,7 +179,8 @@ export const PrintProductionSheet: React.FC<PrintProductionSheetProps> = ({ orde
               </div>
 
             </div>
-          ))
+            );
+          })
         )}
       </div>
 

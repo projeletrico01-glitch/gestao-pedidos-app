@@ -107,6 +107,24 @@ export function calculateRemainingDays(deliveryDateStr: string, status?: OrderSt
   }
 }
 
+// Helper to calculate total environments, machines, panel items and accessories
+export function getOrderTotals(order: Order) {
+  const totalEnvironments = order.environments?.length || 0;
+  const totalMachines = order.environments?.reduce((acc, env) => 
+    acc + (env.machines?.reduce((mAcc, m) => mAcc + (Number(m.quantity) > 0 ? Number(m.quantity) : 1), 0) || 0), 0) || 0;
+  const totalPanelItems = order.environments?.reduce((acc, env) => 
+    acc + (env.panel?.items?.reduce((pAcc, p) => pAcc + (Number(p.quantity) > 0 ? Number(p.quantity) : 1), 0) || 0), 0) || 0;
+  const totalAccessories = order.environments?.reduce((acc, env) => 
+    acc + (env.accessories?.reduce((aAcc, a) => aAcc + (Number(a.quantity) > 0 ? Number(a.quantity) : 1), 0) || 0), 0) || 0;
+
+  return {
+    totalEnvironments,
+    totalMachines,
+    totalPanelItems,
+    totalAccessories
+  };
+}
+
 // Parse Catalog Excel file
 export async function readCatalogFromExcel(file: File): Promise<{ items: CatalogItem[]; error?: string }> {
   try {
@@ -252,6 +270,9 @@ export async function readOrdersFromExcel(file: File): Promise<{ orders: Partial
     const appSheetCol = headerRow.findIndex((h: string) =>
       ['appsheet', 'app sheet', 'app_sheet'].some(k => h.includes(k))
     );
+    const supervisoryCol = headerRow.findIndex((h: string) =>
+      ['supervisor', 'supervisório', 'supervisorio', 'supervisory'].some(k => h.includes(k))
+    );
     const statusCol = headerRow.findIndex((h: string) =>
       ['status', 'situação', 'situacao', 'estado'].some(k => h.includes(k))
     );
@@ -285,6 +306,14 @@ export async function readOrdersFromExcel(file: File): Promise<{ orders: Partial
         }
       }
 
+      let supervisoryVal: 'SIM' | 'NÃO' = 'NÃO';
+      if (supervisoryCol !== -1) {
+        const rawSup = String(row[supervisoryCol] || '').trim().toUpperCase();
+        if (rawSup === 'SIM' || rawSup === 'S' || rawSup === 'YES' || rawSup === 'TRUE' || rawSup === '1') {
+          supervisoryVal = 'SIM';
+        }
+      }
+
       let status: OrderStatus = 'Pendente';
       if (statusCol !== -1) {
         const rawStatus = String(row[statusCol] || '').trim();
@@ -303,6 +332,7 @@ export async function readOrdersFromExcel(file: File): Promise<{ orders: Partial
         orderNumber: orderNum,
         customer: customer,
         appSheet: appSheetVal,
+        supervisory: supervisoryVal,
         status: status,
         deliveryDate: deliveryDate,
         notes: notes,
@@ -324,6 +354,7 @@ export function downloadOrdersTemplate() {
       'Pedido de Venda': 'PV-2026-001',
       'Cliente': 'Refrigeração Modelo S/A',
       'AppSheet': 'SIM',
+      'Supervisório': 'SIM',
       'Status': 'Pendente',
       'Data de Entrega': formatDateBR(getRelativeDate(5)),
       'Observações': 'Montagem prioritária para inauguração de filial'
@@ -332,6 +363,7 @@ export function downloadOrdersTemplate() {
       'Pedido de Venda': 'PV-2026-002',
       'Cliente': 'Indústria Alimentícia São Paulo',
       'AppSheet': 'NÃO',
+      'Supervisório': 'NÃO',
       'Status': 'Pendente',
       'Data de Entrega': formatDateBR(getRelativeDate(10)),
       'Observações': 'Entregar com manual elétrico impresso'
@@ -347,14 +379,14 @@ export function downloadOrdersTemplate() {
 // Export Orders to Excel
 export function exportOrdersToExcel(orders: Order[]) {
   const rows = orders.map(ord => {
-    const totalEnvironments = ord.environments?.length || 0;
-    const totalMachines = ord.environments?.reduce((acc, env) => acc + (env.machines?.length || 0), 0) || 0;
+    const { totalEnvironments, totalMachines } = getOrderTotals(ord);
     const remaining = calculateRemainingDays(ord.deliveryDate, ord.status);
 
     return {
       'Pedido de Venda': ord.orderNumber,
       'Cliente': ord.customer,
       'AppSheet': ord.appSheet,
+      'Supervisório': ord.supervisory || 'NÃO',
       'Status': ord.status,
       'Data de Entrega': formatDateBR(ord.deliveryDate),
       'Prazo / Dias': remaining.text,
@@ -378,7 +410,10 @@ export function exportOrdersToExcel(orders: Order[]) {
         breakdownRows.push({
           'Pedido': ord.orderNumber,
           'Cliente': ord.customer,
+          'Supervisório': ord.supervisory || 'NÃO',
           'Ambiente': env.name,
+          'Temp. Operação': env.operatingTemperature || '',
+          'Distância Evap/Cond': env.evaporatorDistance || '',
           'Seção': 'Máquina',
           'Identificação / Item': `${m.quantity}x ${m.name}`,
           'Código': '',
@@ -392,7 +427,10 @@ export function exportOrdersToExcel(orders: Order[]) {
         breakdownRows.push({
           'Pedido': ord.orderNumber,
           'Cliente': ord.customer,
+          'Supervisório': ord.supervisory || 'NÃO',
           'Ambiente': env.name,
+          'Temp. Operação': env.operatingTemperature || '',
+          'Distância Evap/Cond': env.evaporatorDistance || '',
           'Seção': 'Quadro de Comando',
           'Identificação / Item': env.panel.description || 'Quadro elétrico',
           'Código': '',
@@ -406,7 +444,10 @@ export function exportOrdersToExcel(orders: Order[]) {
         breakdownRows.push({
           'Pedido': ord.orderNumber,
           'Cliente': ord.customer,
+          'Supervisório': ord.supervisory || 'NÃO',
           'Ambiente': env.name,
+          'Temp. Operação': env.operatingTemperature || '',
+          'Distância Evap/Cond': env.evaporatorDistance || '',
           'Seção': 'Acessório',
           'Identificação / Item': 'Acessório Periférico',
           'Código': acc.code || '',

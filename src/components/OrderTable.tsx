@@ -12,7 +12,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { Order, OrderStatus } from '../types';
-import { formatDateBR, calculateRemainingDays } from '../utils/excel';
+import { formatDateBR, calculateRemainingDays, getOrderTotals } from '../utils/excel';
 
 interface OrderTableProps {
   orders: Order[];
@@ -87,18 +87,18 @@ export const OrderTable: React.FC<OrderTableProps> = ({
               <th className="py-3.5 px-4">Pedido de Venda</th>
               <th className="py-3.5 px-4">Cliente / Razão Social</th>
               <th className="py-3.5 px-4 text-center">APPSHEET</th>
+              <th className="py-3.5 px-4 text-center">SUPERVISÓRIO</th>
               <th className="py-3.5 px-4">Status</th>
               <th className="py-3.5 px-4">Data de Entrega</th>
               <th className="py-3.5 px-4 text-center">Dias Restantes</th>
-              <th className="py-3.5 px-4 text-center">Ambientes</th>
+              <th className="py-3.5 px-4 text-center">Ambientes / Máquinas</th>
               <th className="py-3.5 px-4 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
             {orders.map(order => {
               const remaining = calculateRemainingDays(order.deliveryDate, order.status);
-              const envCount = order.environments?.length || 0;
-              const machineCount = order.environments?.reduce((acc, e) => acc + (e.machines?.length || 0), 0) || 0;
+              const { totalEnvironments, totalMachines } = getOrderTotals(order);
 
               return (
                 <tr
@@ -128,6 +128,19 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                   <td className="py-3.5 px-4 text-center">
                     {order.appSheet === 'SIM' ? (
                       <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                        SIM
+                      </span>
+                    ) : (
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                        NÃO
+                      </span>
+                    )}
+                  </td>
+
+                  {/* Supervisório */}
+                  <td className="py-3.5 px-4 text-center">
+                    {order.supervisory === 'SIM' ? (
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
                         SIM
                       </span>
                     ) : (
@@ -167,16 +180,20 @@ export const OrderTable: React.FC<OrderTableProps> = ({
 
                   {/* Environments & Machines Count */}
                   <td className="py-3.5 px-4 text-center">
-                    <span 
-                      className="inline-flex items-center gap-1 text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 font-medium"
-                      title={`${envCount} ambientes, ${machineCount} máquinas`}
+                    <div 
+                      className="inline-flex items-center gap-1.5 justify-center"
+                      title={`${totalEnvironments} ambiente(s) e ${totalMachines} máquina(s) no total`}
                     >
-                      <Layers className="w-3 h-3 text-slate-500" />
-                      <span>{envCount} amb</span>
-                      <span className="text-slate-400">/</span>
-                      <Fan className="w-3 h-3 text-slate-500" />
-                      <span>{machineCount} máq</span>
-                    </span>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                        <Layers className="w-3 h-3 text-blue-600" />
+                        <span>{totalEnvironments} amb</span>
+                      </span>
+                      <span className="text-slate-300 font-bold">/</span>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                        <Fan className="w-3 h-3 text-emerald-600" />
+                        <span>{totalMachines} máq</span>
+                      </span>
+                    </div>
                   </td>
 
                   {/* Actions */}

@@ -43,6 +43,7 @@ export const initialOrdersData: Order[] = [
     orderNumber: 'PV-1024',
     customer: 'Clínica Saúde & Vida Ltda',
     appSheet: 'SIM',
+    supervisory: 'SIM',
     status: 'Pendente',
     deliveryDate: getRelativeDate(3),
     notes: 'Entrega na recepção central. Montagem e teste funcional do quadro de comando antes da liberação final.',
@@ -51,6 +52,8 @@ export const initialOrdersData: Order[] = [
       {
         id: 'env-101',
         name: 'Recepção Principal',
+        operatingTemperature: '22°C',
+        evaporatorDistance: '12m',
         machines: [
           {
             id: 'm-1',
@@ -79,6 +82,8 @@ export const initialOrdersData: Order[] = [
       {
         id: 'env-102',
         name: 'Sala de Exames Tomografia',
+        operatingTemperature: '19°C',
+        evaporatorDistance: '18m',
         machines: [
           {
             id: 'm-2',
@@ -108,6 +113,7 @@ export const initialOrdersData: Order[] = [
     orderNumber: 'PV-1025',
     customer: 'TermoProl Refrigeração Industrial',
     appSheet: 'SIM',
+    supervisory: 'SIM',
     status: 'Pronto',
     deliveryDate: getRelativeDate(1),
     notes: 'Quadro testado em bancada e aprovado pelo controle de qualidade. Aguardando transporte do cliente.',
@@ -116,6 +122,8 @@ export const initialOrdersData: Order[] = [
       {
         id: 'env-201',
         name: 'Câmara Fria de Congelados',
+        operatingTemperature: '-18°C',
+        evaporatorDistance: '25m',
         machines: [
           {
             id: 'm-3',
@@ -147,6 +155,7 @@ export const initialOrdersData: Order[] = [
     orderNumber: 'PV-1026',
     customer: 'Supermercados Horizonte Sul',
     appSheet: 'NÃO',
+    supervisory: 'NÃO',
     status: 'Entregue',
     deliveryDate: getRelativeDate(-4),
     notes: 'Instalação finalizada e comissionada. Garantia de 12 meses ativa.',
@@ -155,6 +164,8 @@ export const initialOrdersData: Order[] = [
       {
         id: 'env-301',
         name: 'Ilha de Laticínios',
+        operatingTemperature: '+2°C a +4°C',
+        evaporatorDistance: '15m',
         machines: [
           {
             id: 'm-4',

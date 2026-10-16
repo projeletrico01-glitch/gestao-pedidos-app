@@ -3,12 +3,13 @@ import {
   Order, 
   OrderStatus 
 } from '../types';
-import { calculateRemainingDays, formatDateBR } from '../utils/excel';
+import { calculateRemainingDays, formatDateBR, getOrderTotals } from '../utils/excel';
 import { 
   Clock, 
   CheckCircle2, 
   Truck, 
   Layers, 
+  Fan,
   Calendar, 
   ArrowRight, 
   ArrowLeft,
@@ -84,7 +85,7 @@ export const OrderKanban: React.FC<OrderKanbanProps> = ({
               ) : (
                 colOrders.map(order => {
                   const remaining = calculateRemainingDays(order.deliveryDate, order.status);
-                  const envCount = order.environments?.length || 0;
+                  const { totalEnvironments, totalMachines } = getOrderTotals(order);
 
                   return (
                     <div
@@ -101,14 +102,35 @@ export const OrderKanban: React.FC<OrderKanbanProps> = ({
                         </span>
                       </div>
 
-                      <h4 className="text-xs font-semibold text-slate-900 mb-2 line-clamp-1">
+                      <h4 className="text-xs font-semibold text-slate-900 mb-1.5 line-clamp-1">
                         {order.customer}
                       </h4>
 
+                      {/* Integration Badges */}
+                      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                        {order.supervisory === 'SIM' && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-800 border border-cyan-200">
+                            📡 Supervisório
+                          </span>
+                        )}
+                        {order.appSheet === 'SIM' && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                            AppSheet
+                          </span>
+                        )}
+                      </div>
+
                       <div className="flex items-center justify-between text-[11px] text-slate-500 mb-3 pt-2 border-t border-slate-100">
-                        <span className="flex items-center gap-1">
-                          <Layers className="w-3.5 h-3.5 text-slate-400" />
-                          {envCount} {envCount === 1 ? 'ambiente' : 'ambientes'}
+                        <span className="flex items-center gap-1.5 font-medium text-slate-600">
+                          <span className="flex items-center gap-1 text-blue-600">
+                            <Layers className="w-3.5 h-3.5" />
+                            {totalEnvironments} amb
+                          </span>
+                          <span className="text-slate-300">/</span>
+                          <span className="flex items-center gap-1 text-emerald-600">
+                            <Fan className="w-3.5 h-3.5" />
+                            {totalMachines} máq
+                          </span>
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />

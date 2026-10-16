@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order } from '../types';
-import { formatDateBR, calculateRemainingDays } from '../utils/excel';
+import { formatDateBR, calculateRemainingDays, getOrderTotals } from '../utils/excel';
 import { CalendarCheck, ChevronRight, Clock, MapPin, User } from 'lucide-react';
 
 interface OrderCalendarProps {
@@ -95,9 +95,14 @@ export const OrderCalendar: React.FC<OrderCalendarProps> = ({
                         )}
                       </div>
                       <div className="flex items-center gap-4 text-xs text-slate-500">
-                        <span>
-                          {order.environments?.length || 0} ambiente(s)
-                        </span>
+                        {(() => {
+                          const { totalEnvironments, totalMachines } = getOrderTotals(order);
+                          return (
+                            <span>
+                              {totalEnvironments} amb • {totalMachines} máq
+                            </span>
+                          );
+                        })()}
                         {order.notes && (
                           <span className="line-clamp-1 italic text-slate-400">
                             "{order.notes}"

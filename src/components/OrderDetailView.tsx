@@ -19,10 +19,15 @@ import {
   Sparkles,
   LayoutGrid,
   ListOrdered,
-  Minus
+  Minus,
+  X,
+  Thermometer,
+  Ruler,
+  SlidersHorizontal,
+  Radio
 } from 'lucide-react';
 import { Order, OrderStatus, Environment, Machine, CodeItem, CatalogItem } from '../types';
-import { calculateRemainingDays, getRelativeDate } from '../utils/excel';
+import { calculateRemainingDays, getRelativeDate, getOrderTotals } from '../utils/excel';
 
 interface OrderDetailViewProps {
   order: Order;
@@ -59,6 +64,9 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   const [quickAccCode, setQuickAccCode] = useState<{ [envId: string]: string }>({});
   const [quickAccQty, setQuickAccQty] = useState<{ [envId: string]: number }>({});
 
+  // Confirmation modal state for environment deletion
+  const [envToDelete, setEnvToDelete] = useState<{ index: number; name: string } | null>(null);
+
   useEffect(() => {
     setCurrentOrder(JSON.parse(JSON.stringify(order)));
     setHasUnsavedChanges(false);
@@ -67,14 +75,15 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
   const remaining = calculateRemainingDays(currentOrder.deliveryDate, currentOrder.status);
 
-  // Technical Summary Calculations
-  const totalEnvironments = currentOrder.environments?.length || 0;
-  const totalMachines = currentOrder.environments?.reduce((acc, env) => 
-    acc + (env.machines?.reduce((mAcc, m) => mAcc + (m.quantity || 1), 0) || 0), 0) || 0;
-  const totalPanelItems = currentOrder.environments?.reduce((acc, env) => 
-    acc + (env.panel?.items?.reduce((pAcc, p) => pAcc + (p.quantity || 1), 0) || 0), 0) || 0;
-  const totalAccessories = currentOrder.environments?.reduce((acc, env) => 
-    acc + (env.accessories?.reduce((aAcc, a) => aAcc + (a.quantity || 1), 0) || 0), 0) || 0;
+  // Technical Summary Calculations using shared getOrderTotals
+  const { totalEnvironments, totalMachines, totalPanelItems, totalAccessories } = getOrderTotals(currentOrder);
+
+  // Auto-sync order state to parent so that table, kanban and local storage always reflect real-time counts
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      onSaveOrder(currentOrder);
+    }
+  }, [currentOrder, hasUnsavedChanges, onSaveOrder]);
 
   // Auto lookup helper: returns item name if code matches in catalog
   const lookupNameByCode = (code: string): string | null => {
@@ -86,6 +95,14 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   const handleFieldChange = (field: keyof Order, value: any) => {
     setCurrentOrder(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      onSaveOrder(currentOrder);
+      setHasUnsavedChanges(false);
+    }
+    onBack();
   };
 
   const handleSave = () => {
@@ -104,6 +121,8 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     const newEnv: Environment = {
       id: 'env-' + Date.now(),
       name: `Ambiente ${newIdx + 1}`,
+      operatingTemperature: '',
+      evaporatorDistance: '',
       machines: [
         {
           id: 'm-' + Date.now(),
@@ -150,19 +169,39 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     onShowToast('Ambiente duplicado com sucesso!', 'info');
   };
 
-  const handleRemoveEnvironment = (envIdx: number) => {
-    if (window.confirm('Tem certeza de que deseja remover este ambiente e todas as suas configurações?')) {
-      const updated = [...currentOrder.environments];
-      updated.splice(envIdx, 1);
+  const handlePromptRemoveEnvironment = (envIdx: number) => {
+    const env = currentOrder.environments[envIdx];
+    const name = env?.name?.trim() ? env.name : `Ambiente ${envIdx + 1}`;
+    setEnvToDelete({ index: envIdx, name });
+  };
+
+  const handleConfirmDeleteEnvironment = () => {
+    if (!envToDelete) return;
+    const { index, name } = envToDelete;
+    const updated = [...(currentOrder.environments || [])];
+    if (index >= 0 && index < updated.length) {
+      updated.splice(index, 1);
       setCurrentOrder(prev => ({ ...prev, environments: updated }));
-      setActiveEnvTab(prev => Math.max(0, Math.min(prev, updated.length - 1)));
+      setActiveEnvTab(prev => {
+        if (updated.length === 0) return 0;
+        return Math.min(prev, updated.length - 1);
+      });
       setHasUnsavedChanges(true);
+      onShowToast(`Ambiente "${name}" excluído com sucesso!`, 'info');
     }
+    setEnvToDelete(null);
   };
 
   const handleUpdateEnvName = (envIdx: number, val: string) => {
     const updated = [...currentOrder.environments];
     updated[envIdx].name = val;
+    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    setHasUnsavedChanges(true);
+  };
+
+  const handleUpdateEnvField = (envIdx: number, field: 'name' | 'operatingTemperature' | 'evaporatorDistance', val: string) => {
+    const updated = [...currentOrder.environments];
+    (updated[envIdx] as any)[field] = val;
     setCurrentOrder(prev => ({ ...prev, environments: updated }));
     setHasUnsavedChanges(true);
   };
@@ -433,7 +472,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onBack}
+            onClick={handleBack}
             className="p-2 hover:bg-slate-100 rounded-xl text-slate-600 transition flex items-center justify-center border border-slate-200"
             title="Voltar para a Lista de Pedidos"
           >
@@ -447,9 +486,14 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
               <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${remaining.badgeClass}`}>
                 {currentOrder.status} ({remaining.text})
               </span>
-              {hasUnsavedChanges && (
-                <span className="text-[11px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
-                  ● Alterações não salvas
+              {hasUnsavedChanges ? (
+                <span className="text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
+                  ● Salvando...
+                </span>
+              ) : (
+                <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  Sincronizado com a tabela
                 </span>
               )}
             </div>
@@ -491,14 +535,19 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
         </div>
       </div>
 
-      {/* General Information Card */}
+      {/* General Information & Order Configuration Card */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 no-print">
-        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
-          <Info className="w-4 h-4 text-blue-600" />
-          <span>Informações Gerais do Pedido</span>
-        </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-blue-600" />
+            <span>Configurações Gerais do Pedido</span>
+          </h3>
+          <span className="text-[11px] text-slate-500 font-medium">
+            Parâmetros principais, integração AppSheet e sistema supervisório
+          </span>
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Pedido de Venda *
@@ -536,6 +585,34 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
             >
               <option value="SIM">SIM (Integrado)</option>
               <option value="NÃO">NÃO (Convencional)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <Radio className="w-3.5 h-3.5 text-cyan-600" />
+                Supervisório
+              </span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                currentOrder.supervisory === 'SIM'
+                  ? 'bg-cyan-100 text-cyan-800 border border-cyan-200'
+                  : 'bg-slate-100 text-slate-500'
+              }`}>
+                {currentOrder.supervisory === 'SIM' ? 'ATIVO' : 'NÃO'}
+              </span>
+            </label>
+            <select
+              value={currentOrder.supervisory || 'NÃO'}
+              onChange={e => handleFieldChange('supervisory', e.target.value as 'SIM' | 'NÃO')}
+              className={`w-full border rounded-lg p-2 text-sm font-semibold focus:ring-2 focus:ring-cyan-500 focus:outline-none transition ${
+                currentOrder.supervisory === 'SIM'
+                  ? 'border-cyan-400 bg-cyan-50/50 text-cyan-900'
+                  : 'border-slate-300 bg-white text-slate-800'
+              }`}
+            >
+              <option value="SIM">SIM (Com Supervisório)</option>
+              <option value="NÃO">NÃO (Sem Supervisório)</option>
             </select>
           </div>
 
@@ -701,11 +778,12 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
         {envDisplayMode === 'tabs' && currentOrder.environments && currentOrder.environments.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {currentOrder.environments.map((env, idx) => (
-              <button
+              <div
                 key={env.id || idx}
-                type="button"
                 onClick={() => setActiveEnvTab(idx)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2.5 flex-shrink-0 border ${
+                role="button"
+                tabIndex={0}
+                className={`group px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 flex-shrink-0 border cursor-pointer select-none ${
                   activeEnvTab === idx
                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
                     : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
@@ -716,13 +794,36 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                 }`}>
                   {idx + 1}
                 </span>
-                <span>{env.name || `Ambiente ${idx + 1}`}</span>
+                <span className="truncate max-w-[150px]">{env.name || `Ambiente ${idx + 1}`}</span>
+                {env.operatingTemperature && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+                    activeEnvTab === idx ? 'bg-cyan-500/30 text-cyan-100' : 'bg-cyan-50 text-cyan-800 border border-cyan-200'
+                  }`} title={`Temperatura de Operação: ${env.operatingTemperature}`}>
+                    {env.operatingTemperature}
+                  </span>
+                )}
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
                   activeEnvTab === idx ? 'bg-blue-500/60 text-white' : 'bg-slate-100 text-slate-500'
                 }`}>
                   {env.machines?.length || 0} máq
                 </span>
-              </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePromptRemoveEnvironment(idx);
+                  }}
+                  className={`p-1 rounded-md transition ${
+                    activeEnvTab === idx 
+                      ? 'text-blue-200 hover:text-white hover:bg-blue-700' 
+                      : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                  }`}
+                  title={`Excluir ${env.name || `Ambiente ${idx + 1}`}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             ))}
 
             <button
@@ -794,13 +895,106 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => handleRemoveEnvironment(envIdx)}
-                      className="px-2.5 py-1.5 text-xs text-red-300 hover:text-red-200 bg-red-950/40 hover:bg-red-900/50 rounded-lg transition flex items-center gap-1.5 border border-red-800/50"
+                      onClick={() => handlePromptRemoveEnvironment(envIdx)}
+                      className="px-2.5 py-1.5 text-xs text-red-300 hover:text-red-200 bg-red-950/40 hover:bg-red-900/50 rounded-lg transition flex items-center gap-1.5 border border-red-800/50 active:scale-95"
                       title="Excluir ambiente"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Excluir</span>
                     </button>
+                  </div>
+                </div>
+
+                {/* Environment Technical Configuration Bar (Temperatura de Operação & Distância da Evaporadora para Condensadora) */}
+                <div className="bg-slate-900 border-t border-slate-700/80 px-4 py-3.5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Temperatura de Operação */}
+                    <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/70 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5 uppercase tracking-wide">
+                          <Thermometer className="w-4 h-4 text-cyan-400" />
+                          <span>Temperatura de Operação</span>
+                        </label>
+                        {env.operatingTemperature && (
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
+                            {env.operatingTemperature}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={env.operatingTemperature || ''}
+                          onChange={e => handleUpdateEnvField(envIdx, 'operatingTemperature', e.target.value)}
+                          placeholder="Ex: -18°C, +2°C a +4°C, 24°C"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        />
+                      </div>
+
+                      {/* Quick temperature presets */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        <span className="text-[10px] text-slate-400 font-medium">Atalhos:</span>
+                        {['-22°C', '-18°C', '0°C', '+2°C', '+18°C', '+24°C'].map(temp => (
+                          <button
+                            key={temp}
+                            type="button"
+                            onClick={() => handleUpdateEnvField(envIdx, 'operatingTemperature', temp)}
+                            className={`text-[10px] px-2 py-0.5 rounded-md font-semibold transition border ${
+                              env.operatingTemperature === temp
+                                ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-bold'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+                            }`}
+                          >
+                            {temp}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Distância da Evaporadora para Condensadora */}
+                    <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/70 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
+                          <Ruler className="w-4 h-4 text-amber-400" />
+                          <span>Distância Evaporadora → Condensadora</span>
+                        </label>
+                        {env.evaporatorDistance && (
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800/60">
+                            {env.evaporatorDistance}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={env.evaporatorDistance || ''}
+                          onChange={e => handleUpdateEnvField(envIdx, 'evaporatorDistance', e.target.value)}
+                          placeholder="Ex: 15m, 25 metros, 8m"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        />
+                      </div>
+
+                      {/* Quick distance presets */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        <span className="text-[10px] text-slate-400 font-medium">Atalhos:</span>
+                        {['5m', '10m', '15m', '20m', '30m', '50m'].map(dist => (
+                          <button
+                            key={dist}
+                            type="button"
+                            onClick={() => handleUpdateEnvField(envIdx, 'evaporatorDistance', dist)}
+                            className={`text-[10px] px-2 py-0.5 rounded-md font-semibold transition border ${
+                              env.evaporatorDistance === dist
+                                ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+                            }`}
+                          >
+                            {dist}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1456,6 +1650,46 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal Confirmation for Environment Deletion */}
+      {envToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center gap-3 text-red-600 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-slate-900">Excluir Ambiente?</h4>
+                <p className="text-xs text-slate-500">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+              Tem certeza de que deseja remover o ambiente <strong className="text-slate-900 font-bold">"{envToDelete.name}"</strong>? 
+              Todas as máquinas, quadro de comando e acessórios deste ambiente serão excluídos permanentemente.
+            </p>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setEnvToDelete(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteEnvironment}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl transition flex items-center gap-1.5 shadow-sm shadow-red-500/20 active:scale-95"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Sim, Excluir Ambiente</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Datalist for autocomplete on all code inputs */}
       <datalist id="catalogDatalist">
