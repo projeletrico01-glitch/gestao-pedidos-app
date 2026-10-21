@@ -119,6 +119,8 @@ export default function App() {
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -130,6 +132,11 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('orderflow_theme_mode', themeMode);
+    if (themeMode === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [themeMode]);
 
   useEffect(() => {
@@ -301,9 +308,8 @@ export default function App() {
 
   const handlePrintOrder = (order: Order) => {
     setActiveOrderId(order.id);
-    setTimeout(() => {
-      window.print();
-    }, 100);
+    setOrderToPrint(order);
+    setIsPrintModalOpen(true);
   };
 
   // Quick add item to catalog from order view
@@ -497,7 +503,7 @@ export default function App() {
             </header>
 
             {/* Main Content Area */}
-            <main className="flex-grow p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+            <main className="flex-grow p-3 sm:p-5 lg:p-6 w-full max-w-full min-w-0">
               {currentView === 'dashboard' ? (
                 <div className="space-y-6">
                   {/* Filter and Control Toolbar */}
@@ -664,6 +670,7 @@ export default function App() {
                     onSaveOrder={handleSaveOrder}
                     onOpenCatalog={() => setIsCatalogModalOpen(true)}
                     onSaveItemToCatalog={handleSaveItemToCatalog}
+                    onPrintOrder={handlePrintOrder}
                     onShowToast={showToast}
                   />
                 )
@@ -692,7 +699,7 @@ export default function App() {
             onNavigateHome={() => setCurrentView('dashboard')}
           />
 
-          <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <main className="flex-grow w-full max-w-full px-3 sm:px-6 py-4 sm:py-6 min-w-0">
             {currentView === 'dashboard' ? (
               <div className="space-y-6">
                 
@@ -882,6 +889,7 @@ export default function App() {
                   onSaveOrder={handleSaveOrder}
                   onOpenCatalog={() => setIsCatalogModalOpen(true)}
                   onSaveItemToCatalog={handleSaveItemToCatalog}
+                  onPrintOrder={handlePrintOrder}
                   onShowToast={showToast}
                 />
               )
@@ -898,9 +906,17 @@ export default function App() {
         </div>
       )}
 
-      {/* Printable Sheet (Shown during window.print) */}
-      {activeOrder && (
-        <PrintProductionSheet order={activeOrder} />
+      {/* Printable Sheet (Interactive Preview & Native Browser Print) */}
+      {(orderToPrint || activeOrder) && (
+        <PrintProductionSheet
+          order={orderToPrint || activeOrder!}
+          isOpen={isPrintModalOpen}
+          onClose={() => {
+            setIsPrintModalOpen(false);
+            setOrderToPrint(null);
+          }}
+          onShowToast={showToast}
+        />
       )}
 
       {/* Catalog Modal */}

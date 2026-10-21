@@ -36,6 +36,7 @@ interface OrderDetailViewProps {
   onSaveOrder: (updatedOrder: Order) => void;
   onOpenCatalog: () => void;
   onSaveItemToCatalog?: (code: string, name: string) => void;
+  onPrintOrder?: (order: Order) => void;
   onShowToast: (msg: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
 }
 
@@ -46,6 +47,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   onSaveOrder,
   onOpenCatalog,
   onSaveItemToCatalog,
+  onPrintOrder,
   onShowToast
 }) => {
   // Local working copy of the order
@@ -468,7 +470,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     <div className="space-y-6">
       
       {/* Top Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm no-print sticky top-20 z-20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200 shadow-sm no-print sticky top-16 z-20">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -516,7 +518,13 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={() => {
+              if (onPrintOrder) {
+                onPrintOrder(currentOrder);
+              } else {
+                window.print();
+              }
+            }}
             className="px-3.5 py-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition flex items-center gap-1.5 shadow-xs border border-slate-200"
             title="Imprimir Ficha de Confecção / PDF"
           >
@@ -702,7 +710,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
             <Cpu className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] text-slate-500 font-semibold uppercase block">Peças de Painel</span>
+            <span className="text-[11px] text-slate-500 font-semibold uppercase block">Quadro de Comando</span>
             <strong className="text-base font-bold text-slate-900">{totalPanelItems}</strong>
           </div>
         </div>

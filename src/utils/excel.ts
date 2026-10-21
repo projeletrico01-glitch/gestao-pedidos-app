@@ -70,7 +70,7 @@ export function calculateRemainingDays(deliveryDateStr: string, status?: OrderSt
   if (status === 'Entregue') {
     return {
       days: diffDays,
-      badgeClass: 'bg-slate-100 text-slate-600 border border-slate-200',
+      badgeClass: 'bg-slate-200 text-slate-800 border border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 font-bold',
       text: 'Entregue',
       isOverdue: false
     };
@@ -79,28 +79,28 @@ export function calculateRemainingDays(deliveryDateStr: string, status?: OrderSt
   if (diffDays < 0) {
     return {
       days: diffDays,
-      badgeClass: 'bg-red-50 text-red-700 border border-red-200 font-bold',
+      badgeClass: 'bg-red-100 text-red-900 border border-red-300 dark:bg-red-950/80 dark:text-red-300 dark:border-red-700 font-bold',
       text: `${Math.abs(diffDays)} dia(s) atrasado`,
       isOverdue: true
     };
   } else if (diffDays === 0) {
     return {
       days: 0,
-      badgeClass: 'bg-amber-500 text-white font-bold animate-pulse shadow-sm',
+      badgeClass: 'bg-amber-500 text-slate-950 font-bold animate-pulse shadow-sm',
       text: 'Entrega HOJE',
       isOverdue: false
     };
   } else if (diffDays <= 3) {
     return {
       days: diffDays,
-      badgeClass: 'bg-amber-50 text-amber-800 border border-amber-300 font-semibold',
+      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700 font-bold',
       text: `${diffDays} dia(s) restante(s)`,
       isOverdue: false
     };
   } else {
     return {
       days: diffDays,
-      badgeClass: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+      badgeClass: 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700 font-bold',
       text: `${diffDays} dias restantes`,
       isOverdue: false
     };

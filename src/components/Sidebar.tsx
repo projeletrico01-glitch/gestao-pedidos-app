@@ -98,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         themeMode === 'dark' 
           ? 'bg-slate-900 border-slate-800 text-slate-200' 
           : 'bg-slate-900 border-slate-800 text-slate-100'
-      } ${isCollapsed ? 'w-20' : 'w-64 lg:w-72'} min-h-screen sticky top-0`}
+      } ${isCollapsed ? 'w-20' : 'w-64 lg:w-72'} h-screen sticky top-0 overflow-y-auto flex flex-col`}
     >
       {/* Brand & Collapse Header */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
