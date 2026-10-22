@@ -465,3 +465,193 @@ export function exportOrdersToExcel(orders: Order[]) {
 
   XLSX.writeFile(wb, `Relatorio_Pedidos_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
+
+// -------------------------------------------------------------
+// INDIVIDUAL MACHINE & PANEL COMPONENTS IMPORT / EXPORT
+// -------------------------------------------------------------
+
+export interface ImportedComponentItem {
+  code: string;
+  name: string;
+  quantity: number;
+}
+
+/**
+ * Reads an Excel file (.xlsx, .xls, .csv) and extracts items for machine or panel components.
+ * Automatically identifies columns for Code (Ref), Description (Name), and Quantity.
+ */
+export async function readComponentsFromExcel(file: File): Promise<{ items: ImportedComponentItem[]; error?: string }> {
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: 'array' });
+    if (!wb.SheetNames.length) {
+      return { items: [], error: 'Arquivo Excel vazio ou sem planilhas.' };
+    }
+
+    const firstSheetName = wb.SheetNames[0];
+    const ws = wb.Sheets[firstSheetName];
+    const rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    if (!rawRows || rawRows.length === 0) {
+      return { items: [], error: 'A planilha selecionada está vazia.' };
+    }
+
+    let headerRowIdx = -1;
+    let codeCol = -1;
+    let nameCol = -1;
+    let qtyCol = -1;
+
+    // Search header row among first 10 rows
+    for (let r = 0; r < Math.min(rawRows.length, 10); r++) {
+      const row = rawRows[r];
+      if (!Array.isArray(row)) continue;
+
+      let foundCode = -1;
+      let foundName = -1;
+      let foundQty = -1;
+
+      for (let c = 0; c < row.length; c++) {
+        const cell = String(row[c] || '').trim().toLowerCase();
+        if (cell) {
+          if (foundCode === -1 && /^(c[oó]d|ref|c[oó]digo|refer[eê]ncia|item|part|pn|id|pe[çc]a\s*c[oó]d)/i.test(cell)) {
+            foundCode = c;
+          } else if (foundName === -1 && /(desc|nome|produto|pe[çc]a|material|especifica)/i.test(cell)) {
+            foundName = c;
+          } else if (foundQty === -1 && /^(q(uan)?t|qtd|qty|quant|quantidade|volume|unidades)/i.test(cell)) {
+            foundQty = c;
+          }
+        }
+      }
+
+      if (foundCode !== -1 || foundName !== -1) {
+        headerRowIdx = r;
+        codeCol = foundCode;
+        nameCol = foundName;
+        qtyCol = foundQty;
+        break;
+      }
+    }
+
+    let startRow = 0;
+    if (headerRowIdx !== -1) {
+      startRow = headerRowIdx + 1;
+      if (codeCol === -1 && nameCol !== -1) {
+        codeCol = nameCol === 0 ? 1 : 0;
+      } else if (nameCol === -1 && codeCol !== -1) {
+        nameCol = codeCol === 0 ? 1 : 0;
+      }
+    } else {
+      // Default fallback: Col 0 = Code, Col 1 = Name, Col 2 = Quantity
+      codeCol = 0;
+      nameCol = 1;
+      qtyCol = 2;
+      startRow = 0;
+      const firstRowStr = (rawRows[0] || []).join(' ').toLowerCase();
+      if (firstRowStr.includes('cod') || firstRowStr.includes('desc') || firstRowStr.includes('ref')) {
+        startRow = 1;
+      }
+    }
+
+    const items: ImportedComponentItem[] = [];
+
+    for (let r = startRow; r < rawRows.length; r++) {
+      const row = rawRows[r];
+      if (!Array.isArray(row) || row.length === 0) continue;
+
+      let code = codeCol !== -1 && row[codeCol] !== undefined ? String(row[codeCol]).trim() : '';
+      let name = nameCol !== -1 && row[nameCol] !== undefined ? String(row[nameCol]).trim() : '';
+      let quantity = 1;
+
+      if (qtyCol !== -1 && row[qtyCol] !== undefined) {
+        const rawQty = parseInt(String(row[qtyCol]).replace(/[^\d]/g, ''));
+        if (!isNaN(rawQty) && rawQty > 0) {
+          quantity = rawQty;
+        }
+      }
+
+      // If user swapped columns (e.g. description in col 0 and short code in col 1)
+      if (code.length > 30 && name.length > 0 && name.length <= 15 && !name.includes(' ')) {
+        const tmp = code;
+        code = name;
+        name = tmp;
+      }
+
+      if (!code && !name) continue;
+
+      code = code.toUpperCase();
+
+      items.push({
+        code,
+        name: name || code,
+        quantity: Math.max(1, quantity)
+      });
+    }
+
+    if (items.length === 0) {
+      return { items: [], error: 'Nenhum componente válido encontrado nas colunas da planilha.' };
+    }
+
+    return { items };
+  } catch (err: any) {
+    return { items: [], error: err.message || 'Erro ao processar arquivo Excel de componentes.' };
+  }
+}
+
+/**
+ * Downloads a pre-formatted Excel template for machine or panel components.
+ */
+export function downloadComponentsTemplate(type: 'maquina' | 'quadro' = 'maquina') {
+  const isMachine = type === 'maquina';
+  const templateData = isMachine
+    ? [
+        {
+          'Código (Ref)': 'COMP-01',
+          'Descrição do Componente': 'Compressor Scroll 5HP R410A 220V',
+          'Quantidade': 1
+        },
+        {
+          'Código (Ref)': 'VALV-EXP',
+          'Descrição do Componente': 'Válvula de Expansão Eletrônica 3/8"',
+          'Quantidade': 1
+        },
+        {
+          'Código (Ref)': 'FILT-G4',
+          'Descrição do Componente': 'Filtro de Ar Lavável G4 500x500mm',
+          'Quantidade': 2
+        },
+        {
+          'Código (Ref)': 'VENT-300',
+          'Descrição do Componente': 'Microventilador Axial 300mm 220V',
+          'Quantidade': 2
+        }
+      ]
+    : [
+        {
+          'Código (Ref)': 'DISJ-32',
+          'Descrição do Componente': 'Disjuntor Trifásico DIN 32A Curva C',
+          'Quantidade': 1
+        },
+        {
+          'Código (Ref)': 'CONT-32',
+          'Descrição do Componente': 'Contator Trifásico 32A 220V (1NA+1NF)',
+          'Quantidade': 2
+        },
+        {
+          'Código (Ref)': 'RELE-TER',
+          'Descrição do Componente': 'Relé Térmico de Sobrecarga 12-18A',
+          'Quantidade': 1
+        },
+        {
+          'Código (Ref)': 'CLP-01',
+          'Descrição do Componente': 'Módulo CLP Siemens S7-1200 CPU 1214C',
+          'Quantidade': 1
+        }
+      ];
+
+  const ws = XLSX.utils.json_to_sheet(templateData);
+  ws['!cols'] = [{ wch: 18 }, { wch: 45 }, { wch: 14 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, isMachine ? 'Componentes Máquina' : 'Componentes Quadro');
+  const fileName = isMachine ? 'Modelo_Componentes_Maquina.xlsx' : 'Modelo_Componentes_Quadro.xlsx';
+  XLSX.writeFile(wb, fileName);
+}
