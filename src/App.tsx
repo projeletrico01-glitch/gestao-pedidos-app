@@ -31,6 +31,7 @@ import { NewOrderModal } from './components/NewOrderModal';
 import { PrintProductionSheet } from './components/PrintProductionSheet';
 import { Toast } from './components/Toast';
 import { TermoprolLogo } from './components/TermoprolLogo';
+import { NomenclatureDecoder } from './components/NomenclatureDecoder';
 import { 
   Search, 
   ListOrdered, 
@@ -121,6 +122,7 @@ export default function App() {
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isNomenclatureModalOpen, setIsNomenclatureModalOpen] = useState(false);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -436,6 +438,7 @@ export default function App() {
             onSelectTab={setDashboardTab}
             onSelectStatusFilter={setStatusFilter}
             onOpenCatalog={() => setIsCatalogModalOpen(true)}
+            onOpenNomenclature={() => setIsNomenclatureModalOpen(true)}
             onOpenNewOrder={() => setIsNewOrderModalOpen(true)}
             onImportOrdersExcel={handleImportOrdersExcel}
             onExportOrdersExcel={handleExportOrdersExcel}
@@ -691,6 +694,7 @@ export default function App() {
             onToggleTheme={toggleTheme}
             onToggleDensity={toggleDensity}
             onOpenCatalog={() => setIsCatalogModalOpen(true)}
+            onOpenNomenclature={() => setIsNomenclatureModalOpen(true)}
             onOpenNewOrder={() => setIsNewOrderModalOpen(true)}
             onImportOrdersExcel={handleImportOrdersExcel}
             onExportOrdersExcel={handleExportOrdersExcel}
@@ -927,6 +931,47 @@ export default function App() {
         onUpdateCatalog={setCatalog}
         onShowToast={showToast}
       />
+
+      {/* Nomenclature Consultation Modal */}
+      {isNomenclatureModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700 max-w-5xl w-full max-h-[92vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3 text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <span>Consulta de Nomenclaturas Termoprol</span>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full font-mono">
+                      Linha T (Rev-12) & QC/QF (Rev-07)
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Consulte o significado de cada sigla do modelo da máquina ou do quadro de comando
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsNomenclatureModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition text-base font-bold"
+                title="Fechar Consulta"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              <NomenclatureDecoder hideHeader={true} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Order Modal */}
       <NewOrderModal

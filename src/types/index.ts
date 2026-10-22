@@ -25,6 +25,8 @@ export interface Environment {
   name: string;
   operatingTemperature?: string; // Temperatura de operação (ex: -18°C, +2°C a +4°C)
   evaporatorDistance?: string; // Distância da evaporadora para condensadora (ex: 15m)
+  machineModelCode?: string; // Código de nomenclatura da máquina (ex: MTM420S01H9F0G3P0P1100411000NP)
+  panelModelCode?: string; // Código de nomenclatura do quadro de comando (ex: QFBTU1100I00C3B0G1P0P5 ou QC04350100P102)
   machines: Machine[];
   panel: PanelSpecification;
   accessories: CodeItem[];

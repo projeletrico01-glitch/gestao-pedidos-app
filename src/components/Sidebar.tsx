@@ -39,6 +39,7 @@ interface SidebarProps {
   onSelectTab: (tab: ViewMode) => void;
   onSelectStatusFilter: (status: string) => void;
   onOpenCatalog: () => void;
+  onOpenNomenclature?: () => void;
   onOpenNewOrder: () => void;
   onImportOrdersExcel: (file: File) => void;
   onExportOrdersExcel: () => void;
@@ -64,6 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   onSelectStatusFilter,
   onOpenCatalog,
+  onOpenNomenclature,
   onOpenNewOrder,
   onImportOrdersExcel,
   onExportOrdersExcel,
@@ -349,6 +351,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </span>
               )}
             </button>
+
+            {onOpenNomenclature && (
+              <button
+                onClick={onOpenNomenclature}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-blue-300 hover:bg-slate-800 transition border border-blue-500/20 ${
+                  isCollapsed ? 'justify-center px-0' : ''
+                }`}
+                title="Consultar Nomenclaturas Termoprol (Linha T & QC/QF)"
+              >
+                <Sliders className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                {!isCollapsed && <span>Nomenclaturas (Linha T & QC)</span>}
+              </button>
+            )}
 
             {/* Hidden Input for Excel Orders */}
             <input

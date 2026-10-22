@@ -31,6 +31,7 @@ interface HeaderProps {
   onToggleTheme?: () => void;
   onToggleDensity?: () => void;
   onOpenCatalog: () => void;
+  onOpenNomenclature?: () => void;
   onOpenNewOrder: () => void;
   onImportOrdersExcel: (file: File) => void;
   onExportOrdersExcel: () => void;
@@ -49,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   onToggleDensity,
   onOpenCatalog,
+  onOpenNomenclature,
   onOpenNewOrder,
   onImportOrdersExcel,
   onExportOrdersExcel,
@@ -137,6 +139,18 @@ export const Header: React.FC<HeaderProps> = ({
                 {catalogCount}
               </span>
             </button>
+
+            {/* Nomenclature Consultation Button */}
+            {onOpenNomenclature && (
+              <button
+                onClick={onOpenNomenclature}
+                className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium bg-slate-800 hover:bg-slate-700 text-blue-300 rounded-lg transition border border-slate-700 flex items-center gap-1.5"
+                title="Consultar Nomenclaturas Termoprol (Linha T & QC/QF)"
+              >
+                <Sliders className="w-4 h-4 text-blue-400" />
+                <span className="hidden md:inline">Nomenclaturas (Linha T & QC)</span>
+              </button>
+            )}
 
             {/* Excel Import button */}
             <input

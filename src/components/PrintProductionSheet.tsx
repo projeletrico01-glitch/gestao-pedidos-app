@@ -99,6 +99,12 @@ export function generateStandaloneSheetHtml(order: Order): string {
         </div>
       </div>
       <div class="env-body">
+        ${(env.machineModelCode || env.panelModelCode) ? `
+          <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 10px; margin-bottom: 10px; font-size: 8.5pt; display: flex; flex-wrap: wrap; gap: 14px;">
+            ${env.machineModelCode ? `<div><span style="color: #64748b; font-weight: bold; text-transform: uppercase;">Modelo Máquina (Linha T):</span> <span style="font-family: monospace; font-weight: 800; color: #1e3a8a; background: #e0f2fe; padding: 2px 6px; border-radius: 4px;">${env.machineModelCode}</span></div>` : ''}
+            ${env.panelModelCode ? `<div><span style="color: #64748b; font-weight: bold; text-transform: uppercase;">Quadro de Comando (QC/QF):</span> <span style="font-family: monospace; font-weight: 800; color: #92400e; background: #fef3c7; padding: 2px 6px; border-radius: 4px;">${env.panelModelCode}</span></div>` : ''}
+          </div>
+        ` : ''}
         <div class="section-title">Máquinas & Equipamentos (${env.machines?.length || 0})</div>
         ${(env.machines || []).map(m => `
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-bottom: 8px;">
@@ -317,6 +323,28 @@ export const PrintProductionSheet: React.FC<PrintProductionSheetProps> = ({
                     </span>
                   </div>
                 </div>
+
+                {/* Nomenclature Model Codes */}
+                {(env.machineModelCode || env.panelModelCode) && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 mb-3 text-xs flex flex-wrap gap-4 items-center">
+                    {env.machineModelCode && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Modelo da Máquina (Linha T):</span>
+                        <span className="font-mono font-bold text-blue-900 bg-blue-100/70 border border-blue-200 px-2 py-0.5 rounded text-[11px]">
+                          {env.machineModelCode}
+                        </span>
+                      </div>
+                    )}
+                    {env.panelModelCode && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Quadro de Comando (QC/QF):</span>
+                        <span className="font-mono font-bold text-amber-900 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded text-[11px]">
+                          {env.panelModelCode}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Machines */}
                 <div className="mb-4">

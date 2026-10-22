@@ -54,6 +54,8 @@ export const initialOrdersData: Order[] = [
         name: 'Recepção Principal',
         operatingTemperature: '22°C',
         evaporatorDistance: '12m',
+        machineModelCode: 'MTS1100S01H9F0G3P0P1100411000NP',
+        panelModelCode: 'QC04350100P102',
         machines: [
           {
             id: 'm-1',
@@ -124,6 +126,8 @@ export const initialOrdersData: Order[] = [
         name: 'Câmara Fria de Congelados',
         operatingTemperature: '-18°C',
         evaporatorDistance: '25m',
+        machineModelCode: 'MTM420S01H9F0G3P0P1100411000NP',
+        panelModelCode: 'QFBTU1100I00C3B0G1P0P5',
         machines: [
           {
             id: 'm-3',

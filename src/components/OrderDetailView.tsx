@@ -24,10 +24,16 @@ import {
   Thermometer,
   Ruler,
   SlidersHorizontal,
-  Radio
+  Radio,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
+  FileCode
 } from 'lucide-react';
 import { Order, OrderStatus, Environment, Machine, CodeItem, CatalogItem } from '../types';
 import { calculateRemainingDays, getRelativeDate, getOrderTotals } from '../utils/excel';
+import { NomenclatureDecoder } from './NomenclatureDecoder';
+import { decodeMachineNomenclature, decodePanelNomenclature, NomenclatureResult } from '../utils/nomenclature';
 
 interface OrderDetailViewProps {
   order: Order;
@@ -68,6 +74,9 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
   // Confirmation modal state for environment deletion
   const [envToDelete, setEnvToDelete] = useState<{ index: number; name: string } | null>(null);
+
+  // Nomenclature decoder modal state
+  const [isNomenclatureModalOpen, setIsNomenclatureModalOpen] = useState(false);
 
   useEffect(() => {
     setCurrentOrder(JSON.parse(JSON.stringify(order)));
@@ -201,11 +210,84 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     setHasUnsavedChanges(true);
   };
 
-  const handleUpdateEnvField = (envIdx: number, field: 'name' | 'operatingTemperature' | 'evaporatorDistance', val: string) => {
+  const handleUpdateEnvField = (
+    envIdx: number, 
+    field: 'name' | 'operatingTemperature' | 'evaporatorDistance' | 'machineModelCode' | 'panelModelCode', 
+    val: string
+  ) => {
     const updated = [...currentOrder.environments];
     (updated[envIdx] as any)[field] = val;
+
+    // Auto-detect parameters if typing/pasting nomenclature code
+    if (field === 'machineModelCode' && val.trim()) {
+      const decoded = decodeMachineNomenclature(val);
+      if (decoded.detectedOperatingTemp && !updated[envIdx].operatingTemperature) {
+        updated[envIdx].operatingTemperature = decoded.detectedOperatingTemp;
+      }
+      if (decoded.detectedDistance && !updated[envIdx].evaporatorDistance) {
+        updated[envIdx].evaporatorDistance = decoded.detectedDistance;
+      }
+      if (decoded.detectedSupervisory && currentOrder.supervisory !== 'SIM') {
+        setCurrentOrder(prev => ({ ...prev, supervisory: 'SIM' }));
+      }
+    } else if (field === 'panelModelCode' && val.trim()) {
+      const decoded = decodePanelNomenclature(val);
+      if (decoded.detectedSupervisory && currentOrder.supervisory !== 'SIM') {
+        setCurrentOrder(prev => ({ ...prev, supervisory: 'SIM' }));
+      }
+    }
+
     setCurrentOrder(prev => ({ ...prev, environments: updated }));
     setHasUnsavedChanges(true);
+  };
+
+  const handleApplyMachineNomenclature = (envIdx: number, code: string, decoded: NomenclatureResult) => {
+    const updated = [...currentOrder.environments];
+    const env = updated[envIdx];
+    if (!env) return;
+    env.machineModelCode = code;
+
+    // If machine name is empty or default, suggest friendly name
+    if (env.machines && env.machines.length > 0 && (!env.machines[0].name || env.machines[0].name.startsWith('Ambiente') || env.machines[0].name.startsWith('Máquina'))) {
+      const typeSeg = decoded.segments.find(s => s.key === 'CFG_003');
+      const modelSeg = decoded.segments.find(s => s.key === 'CFG_004');
+      env.machines[0].name = `${typeSeg?.description || 'Equipamento'} ${modelSeg?.description || code}`.trim();
+    }
+
+    if (decoded.detectedOperatingTemp && !env.operatingTemperature) {
+      env.operatingTemperature = decoded.detectedOperatingTemp;
+    }
+    if (decoded.detectedDistance && !env.evaporatorDistance) {
+      env.evaporatorDistance = decoded.detectedDistance;
+    }
+    if (decoded.detectedSupervisory && currentOrder.supervisory !== 'SIM') {
+      setCurrentOrder(prev => ({ ...prev, supervisory: 'SIM' }));
+    }
+
+    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    setHasUnsavedChanges(true);
+    onShowToast(`Nomenclatura da máquina [${code}] aplicada com sucesso!`, 'success');
+  };
+
+  const handleApplyPanelNomenclature = (envIdx: number, code: string, decoded: NomenclatureResult) => {
+    const updated = [...currentOrder.environments];
+    const env = updated[envIdx];
+    if (!env) return;
+    env.panelModelCode = code;
+
+    // Auto-update panel description if empty
+    if (!env.panel?.description || env.panel.description.startsWith('Quadro de comando não especificado')) {
+      env.panel = env.panel || { description: '', items: [] };
+      env.panel.description = `${decoded.typeName} - ${code}`;
+    }
+
+    if (decoded.detectedSupervisory && currentOrder.supervisory !== 'SIM') {
+      setCurrentOrder(prev => ({ ...prev, supervisory: 'SIM' }));
+    }
+
+    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    setHasUnsavedChanges(true);
+    onShowToast(`Nomenclatura do quadro [${code}] aplicada com sucesso!`, 'success');
   };
 
   // Machine operations
@@ -506,6 +588,16 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsNomenclatureModalOpen(true)}
+            className="px-3 py-2 text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-xl border border-blue-200 transition flex items-center gap-1.5 shadow-xs"
+            title="Abrir Decodificador de Nomenclaturas Termoprol (Linha T & QC/QF)"
+          >
+            <Sliders className="w-4 h-4 text-blue-600" />
+            <span>Nomenclaturas (Linha T & QC)</span>
+          </button>
+
           <button
             type="button"
             onClick={onOpenCatalog}
@@ -1694,6 +1786,79 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                 <Trash2 className="w-4 h-4" />
                 <span>Sim, Excluir Ambiente</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Nomenclature Decoder Modal Dialog */}
+      {isNomenclatureModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700 max-w-5xl w-full max-h-[92vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3 text-white">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <span>Decodificador de Nomenclatura Termoprol</span>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-full font-mono">
+                      Linha T (Rev-12) & QC/QF (Rev-07)
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Preencha o modelo da máquina ou quadro de comando para inspecionar cada sigla ou aplicar ao ambiente selecionado
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {currentOrder.environments && currentOrder.environments.length > 0 && (
+                  <div className="hidden sm:flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+                    <span className="text-slate-400 font-medium">Ambiente Alvo:</span>
+                    <select
+                      value={activeEnvTab}
+                      onChange={e => setActiveEnvTab(Number(e.target.value))}
+                      className="bg-transparent text-white font-bold focus:outline-none cursor-pointer"
+                    >
+                      {currentOrder.environments.map((env, eIdx) => (
+                        <option key={env.id || eIdx} value={eIdx} className="bg-slate-900 text-white">
+                          Ambiente {eIdx + 1}: {env.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setIsNomenclatureModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition text-base font-bold"
+                  title="Fechar Decodificador"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              <NomenclatureDecoder
+                initialMachineCode={currentOrder.environments[activeEnvTab]?.machineModelCode || ''}
+                initialPanelCode={currentOrder.environments[activeEnvTab]?.panelModelCode || ''}
+                onApplyMachineCode={(code, decoded) => {
+                  handleApplyMachineNomenclature(activeEnvTab, code, decoded);
+                  setIsNomenclatureModalOpen(false);
+                }}
+                onApplyPanelCode={(code, decoded) => {
+                  handleApplyPanelNomenclature(activeEnvTab, code, decoded);
+                  setIsNomenclatureModalOpen(false);
+                }}
+                compact={false}
+                hideHeader={true}
+              />
             </div>
           </div>
         </div>
