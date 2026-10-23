@@ -69,7 +69,14 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
       const saved = localStorage.getItem('orderflow_orders_data');
-      return saved ? JSON.parse(saved) : initialOrdersData;
+      if (saved) {
+        const parsed: Order[] = JSON.parse(saved);
+        return parsed.map(o => ({
+          ...o,
+          status: o.status === ('Pronto' as any) ? 'Em Andamento' : o.status
+        }));
+      }
+      return initialOrdersData;
     } catch {
       return initialOrdersData;
     }
@@ -114,7 +121,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [appSheetFilter, setAppSheetFilter] = useState<string>('ALL');
-  const [sortBy, setSortBy] = useState<'urgency' | 'orderNumber' | 'customer' | 'newest'>('urgency');
+  const [sortBy, setSortBy] = useState<'status' | 'urgency' | 'orderNumber' | 'customer' | 'newest'>('status');
 
   // Modals
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
@@ -218,6 +225,8 @@ export default function App() {
         let matchesStatus = true;
         if (statusFilter === 'Atrasado') {
           matchesStatus = remaining.isOverdue;
+        } else if (statusFilter === 'Em Andamento' || statusFilter === 'Pronto') {
+          matchesStatus = order.status === 'Em Andamento' || (order.status as any) === 'Pronto';
         } else if (statusFilter !== 'ALL') {
           matchesStatus = order.status === statusFilter;
         }
@@ -230,7 +239,30 @@ export default function App() {
         return matchesSearch && matchesStatus && matchesAppSheet;
       })
       .sort((a, b) => {
-        if (sortBy === 'urgency') {
+        // Status weight: Pendente = 1, Em Andamento = 2, Entregue = 3
+        const getStatusRank = (status: OrderStatus | string) => {
+          if (status === 'Pendente') return 1;
+          if (status === 'Em Andamento' || status === 'Pronto') return 2;
+          if (status === 'Entregue') return 3;
+          return 4;
+        };
+
+        if (sortBy === 'status') {
+          // Priorizar os pendentes (1º), em andamento (2º) e por último os entregues (3º)
+          const rankA = getStatusRank(a.status);
+          const rankB = getStatusRank(b.status);
+          if (rankA !== rankB) return rankA - rankB;
+
+          // Dentro do mesmo status, ordenar pelo prazo mais próximo
+          const remA = calculateRemainingDays(a.deliveryDate, a.status).days;
+          const remB = calculateRemainingDays(b.deliveryDate, b.status).days;
+          return remA - remB;
+        } else if (sortBy === 'urgency') {
+          // Na ordenação de urgência, entregues também vão para o final
+          const isEntregueA = a.status === 'Entregue' ? 1 : 0;
+          const isEntregueB = b.status === 'Entregue' ? 1 : 0;
+          if (isEntregueA !== isEntregueB) return isEntregueA - isEntregueB;
+
           const remA = calculateRemainingDays(a.deliveryDate, a.status).days;
           const remB = calculateRemainingDays(b.deliveryDate, b.status).days;
           return remA - remB;
@@ -557,7 +589,8 @@ export default function App() {
                           onChange={e => setSortBy(e.target.value as any)}
                           className="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                          <option value="urgency">Mais Urgentes</option>
+                          <option value="status">Prioridade: Pendentes 1º → Em Andamento → Entregues</option>
+                          <option value="urgency">Mais Urgentes (Prazo)</option>
                           <option value="orderNumber">Nº Pedido</option>
                           <option value="customer">Cliente</option>
                           <option value="newest">Mais Recentes</option>
@@ -744,10 +777,10 @@ export default function App() {
                         className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="ALL">Todos os Status</option>
-                        <option value="Pendente">🟡 Pendente</option>
-                        <option value="Pronto">🟢 Pronto</option>
-                        <option value="Entregue">⚪ Entregue</option>
-                        <option value="Atrasado">🔴 Atrasados</option>
+                        <option value="Pendente">🔴 Pendente</option>
+                        <option value="Em Andamento">🟡 Em Andamento</option>
+                        <option value="Entregue">🟢 Entregue</option>
+                        <option value="Atrasado">⚠️ Atrasados</option>
                       </select>
                     </div>
 
@@ -774,6 +807,7 @@ export default function App() {
                         onChange={e => setSortBy(e.target.value as any)}
                         className="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
+                        <option value="status">Prioridade: Pendentes 1º → Em Andamento → Entregues</option>
                         <option value="urgency">Ordenar: Mais Urgentes</option>
                         <option value="orderNumber">Ordenar: Nº Pedido</option>
                         <option value="customer">Ordenar: Cliente</option>

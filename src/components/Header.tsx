@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(o => o.status === 'Pendente').length;
-  const readyOrders = orders.filter(o => o.status === 'Pronto').length;
+  const inProgressOrders = orders.filter(o => o.status === 'Em Andamento' || (o.status as any) === 'Pronto').length;
   const deliveredOrders = orders.filter(o => o.status === 'Entregue').length;
   const overdueOrders = orders.filter(o => {
     const rem = calculateRemainingDays(o.deliveryDate, o.status);
@@ -100,18 +100,18 @@ export const Header: React.FC<HeaderProps> = ({
               <span>Total: <strong className="text-white">{totalOrders}</strong></span>
             </div>
             <div className="h-3 w-px bg-slate-700" />
-            <div className="flex items-center gap-1.5 px-2 text-amber-300" title="Pendentes de fabricação">
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <div className="flex items-center gap-1.5 px-2 text-red-300" title="Pendentes de confecção">
+              <Clock className="w-3.5 h-3.5 text-red-400" />
               <span>Pendentes: <strong className="text-white">{pendingOrders}</strong></span>
             </div>
             <div className="h-3 w-px bg-slate-700" />
-            <div className="flex items-center gap-1.5 px-2 text-emerald-300" title="Prontos para expedição">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Prontos: <strong className="text-white">{readyOrders}</strong></span>
+            <div className="flex items-center gap-1.5 px-2 text-amber-300" title="Em andamento / testes">
+              <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Em Andamento: <strong className="text-white">{inProgressOrders}</strong></span>
             </div>
             <div className="h-3 w-px bg-slate-700" />
-            <div className="flex items-center gap-1.5 px-2 text-slate-400" title="Entregues">
-              <Truck className="w-3.5 h-3.5 text-slate-300" />
+            <div className="flex items-center gap-1.5 px-2 text-emerald-300" title="Entregues / Expedidos">
+              <Truck className="w-3.5 h-3.5 text-emerald-400" />
               <span>Entregues: <strong className="text-white">{deliveredOrders}</strong></span>
             </div>
             {overdueOrders > 0 && (

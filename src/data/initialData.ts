@@ -116,7 +116,7 @@ export const initialOrdersData: Order[] = [
     customer: 'TermoProl Refrigeração Industrial',
     appSheet: 'SIM',
     supervisory: 'SIM',
-    status: 'Pronto',
+    status: 'Em Andamento',
     deliveryDate: getRelativeDate(1),
     notes: 'Quadro testado em bancada e aprovado pelo controle de qualidade. Aguardando transporte do cliente.',
     createdAt: new Date().toISOString(),

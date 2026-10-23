@@ -112,12 +112,14 @@ export const OrderCalendar: React.FC<OrderCalendarProps> = ({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
-                        order.status === 'Pronto' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                        order.status === 'Entregue' ? 'bg-slate-100 text-slate-600' :
-                        'bg-amber-50 text-amber-700 border border-amber-200'
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                        order.status === 'Pendente'
+                          ? 'bg-red-50 text-red-700 border border-red-200'
+                          : order.status === 'Entregue'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}>
-                        {order.status}
+                        {order.status === 'Pronto' ? 'Em Andamento' : order.status}
                       </span>
                       <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition" />
                     </div>

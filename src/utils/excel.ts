@@ -316,9 +316,9 @@ export async function readOrdersFromExcel(file: File): Promise<{ orders: Partial
 
       let status: OrderStatus = 'Pendente';
       if (statusCol !== -1) {
-        const rawStatus = String(row[statusCol] || '').trim();
-        if (rawStatus.toLowerCase().includes('pronto')) status = 'Pronto';
-        else if (rawStatus.toLowerCase().includes('entregue')) status = 'Entregue';
+        const rawStatus = String(row[statusCol] || '').trim().toLowerCase();
+        if (rawStatus.includes('andamento') || rawStatus.includes('pronto')) status = 'Em Andamento';
+        else if (rawStatus.includes('entreg')) status = 'Entregue';
         else status = 'Pendente';
       }
 

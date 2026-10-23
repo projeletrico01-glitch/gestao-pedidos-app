@@ -48,7 +48,7 @@ export const OrderTable: React.FC<OrderTableProps> = ({
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
           <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping" />
-          Atrasado ({status})
+          Atrasado ({status === 'Pronto' ? 'Em Andamento' : status})
         </span>
       );
     }
@@ -56,22 +56,23 @@ export const OrderTable: React.FC<OrderTableProps> = ({
     switch (status) {
       case 'Pendente':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-800 border border-red-200 dark:bg-red-950/60 dark:text-red-300 dark:border-red-800">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
             Pendente
           </span>
         );
+      case 'Em Andamento':
       case 'Pronto':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Pronto
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Em Andamento
           </span>
         );
       case 'Entregue':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             Entregue
           </span>
         );
@@ -81,11 +82,12 @@ export const OrderTable: React.FC<OrderTableProps> = ({
   const getStatusBadgeStyle = (status: OrderStatus) => {
     switch (status) {
       case 'Pendente':
-        return 'bg-amber-100 text-amber-950 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-700';
+        return 'bg-red-100 text-red-950 border-red-300 dark:bg-red-950 dark:text-red-200 dark:border-red-700';
+      case 'Em Andamento':
       case 'Pronto':
-        return 'bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-700';
+        return 'bg-amber-100 text-amber-950 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-700';
       case 'Entregue':
-        return 'bg-slate-200 text-slate-900 border-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
+        return 'bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-700';
       default:
         return 'bg-slate-100 text-slate-900 border-slate-200 dark:bg-slate-800 dark:text-slate-200';
     }
@@ -166,19 +168,19 @@ export const OrderTable: React.FC<OrderTableProps> = ({
                   {/* Status with quick change & high contrast */}
                   <td className="py-3 px-3 sm:py-3.5 sm:px-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     <select
-                      value={order.status}
+                      value={order.status === 'Pronto' ? 'Em Andamento' : order.status}
                       onChange={e => onUpdateStatus(order.id, e.target.value as OrderStatus)}
                       className={`text-xs font-bold cursor-pointer rounded-lg px-2.5 py-1 border shadow-xs transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${getStatusBadgeStyle(order.status)}`}
                       title="Clique para alterar status rapidamente"
                     >
-                      <option value="Pendente" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 font-semibold">
-                        🟡 Pendente
+                      <option value="Pendente" className="bg-white text-red-700 dark:bg-slate-900 dark:text-red-400 font-bold">
+                        🔴 Pendente
                       </option>
-                      <option value="Pronto" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 font-semibold">
-                        🟢 Pronto
+                      <option value="Em Andamento" className="bg-white text-amber-700 dark:bg-slate-900 dark:text-amber-400 font-bold">
+                        🟡 Em Andamento
                       </option>
-                      <option value="Entregue" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 font-semibold">
-                        ⚪ Entregue
+                      <option value="Entregue" className="bg-white text-emerald-700 dark:bg-slate-900 dark:text-emerald-400 font-bold">
+                        🟢 Entregue
                       </option>
                     </select>
                   </td>

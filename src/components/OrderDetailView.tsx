@@ -35,7 +35,10 @@ import {
   Ban,
   ShieldAlert,
   CheckSquare,
-  Square
+  Square,
+  Maximize2,
+  Minimize2,
+  Eye
 } from 'lucide-react';
 import { Order, OrderStatus, Environment, Machine, CodeItem, CatalogItem, ExcludedComponentItem } from '../types';
 import { 
@@ -90,6 +93,9 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   const [envDisplayMode, setEnvDisplayMode] = useState<'tabs' | 'cards'>('tabs');
   const [activeEnvTab, setActiveEnvTab] = useState(0);
 
+  // Focus mode state: when set to an environment ID, that environment occupies full view, hiding the other sections of the order
+  const [focusedEnvId, setFocusedEnvId] = useState<string | null>(null);
+
   // Quick Add states for each section
   const [quickMachineCode, setQuickMachineCode] = useState<{ [machineId: string]: string }>({});
   const [quickMachineQty, setQuickMachineQty] = useState<{ [machineId: string]: number }>({});
@@ -135,7 +141,19 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     setCurrentOrder(JSON.parse(JSON.stringify(order)));
     setHasUnsavedChanges(false);
     setActiveEnvTab(0);
+    setFocusedEnvId(null);
   }, [order.id]);
+
+  // Exit focus mode on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && focusedEnvId) {
+        setFocusedEnvId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [focusedEnvId]);
 
   const remaining = calculateRemainingDays(currentOrder.deliveryDate, currentOrder.status);
 

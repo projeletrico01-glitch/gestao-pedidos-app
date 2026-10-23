@@ -32,29 +32,34 @@ export const OrderKanban: React.FC<OrderKanbanProps> = ({
       status: 'Pendente',
       label: 'Pendentes de Confecção',
       icon: Clock,
-      dotColor: 'bg-amber-400',
-      bgBadge: 'bg-amber-100 text-amber-800'
+      dotColor: 'bg-red-500',
+      bgBadge: 'bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300'
     },
     {
-      status: 'Pronto',
-      label: 'Prontos / Testados',
+      status: 'Em Andamento',
+      label: 'Em Andamento / Testes',
       icon: CheckCircle2,
-      dotColor: 'bg-emerald-500',
-      bgBadge: 'bg-emerald-100 text-emerald-800'
+      dotColor: 'bg-amber-500',
+      bgBadge: 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
     },
     {
       status: 'Entregue',
       label: 'Entregues / Expedidos',
       icon: Truck,
-      dotColor: 'bg-slate-400',
-      bgBadge: 'bg-slate-100 text-slate-700'
+      dotColor: 'bg-emerald-500',
+      bgBadge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
     }
   ];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {columns.map(col => {
-        const colOrders = orders.filter(o => o.status === col.status);
+        const colOrders = orders.filter(o => {
+          if (col.status === 'Em Andamento') {
+            return o.status === 'Em Andamento' || (o.status as any) === 'Pronto';
+          }
+          return o.status === col.status;
+        });
         const Icon = col.icon;
 
         return (
@@ -149,21 +154,21 @@ export const OrderKanban: React.FC<OrderKanbanProps> = ({
                             <button
                               type="button"
                               onClick={() => onUpdateStatus(order.id, 'Pendente')}
-                              className="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 dark:bg-slate-700 dark:hover:bg-amber-950 dark:text-slate-300 dark:hover:text-amber-200 rounded transition font-medium"
+                              className="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-red-100 text-slate-700 hover:text-red-900 dark:bg-slate-700 dark:hover:bg-red-950 dark:text-slate-300 dark:hover:text-red-200 rounded transition font-bold"
                               title="Retornar para Pendente"
                             >
-                              Pendente
+                              🔴 Pendente
                             </button>
                           )}
 
-                          {col.status !== 'Pronto' && (
+                          {col.status !== 'Em Andamento' && (
                             <button
                               type="button"
-                              onClick={() => onUpdateStatus(order.id, 'Pronto')}
-                              className="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 dark:bg-slate-700 dark:hover:bg-emerald-950 dark:text-slate-300 dark:hover:text-emerald-200 rounded transition font-medium"
-                              title="Marcar como Pronto"
+                              onClick={() => onUpdateStatus(order.id, 'Em Andamento')}
+                              className="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 dark:bg-slate-700 dark:hover:bg-amber-950 dark:text-slate-300 dark:hover:text-amber-200 rounded transition font-bold"
+                              title="Mover para Em Andamento"
                             >
-                              Pronto
+                              🟡 Em Andamento
                             </button>
                           )}
 
@@ -171,10 +176,10 @@ export const OrderKanban: React.FC<OrderKanbanProps> = ({
                             <button
                               type="button"
                               onClick={() => onUpdateStatus(order.id, 'Entregue')}
-                              className="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-300 dark:hover:text-white rounded transition font-medium"
+                              className="px-2 py-0.5 text-[10px] bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-900 dark:bg-slate-700 dark:hover:bg-emerald-950 dark:text-slate-300 dark:hover:text-emerald-200 rounded transition font-bold"
                               title="Marcar como Entregue"
                             >
-                              Entregue
+                              🟢 Entregue
                             </button>
                           )}
                         </div>

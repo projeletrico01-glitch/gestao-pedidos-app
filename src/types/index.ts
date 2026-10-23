@@ -1,4 +1,4 @@
-export type OrderStatus = 'Pendente' | 'Pronto' | 'Entregue';
+export type OrderStatus = 'Pendente' | 'Em Andamento' | 'Entregue' | 'Pronto';
 
 export interface CodeItem {
   code: string;

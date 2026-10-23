@@ -80,7 +80,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(o => o.status === 'Pendente').length;
-  const readyOrders = orders.filter(o => o.status === 'Pronto').length;
+  const inProgressOrders = orders.filter(o => o.status === 'Em Andamento' || (o.status as any) === 'Pronto').length;
   const deliveredOrders = orders.filter(o => o.status === 'Entregue').length;
   const overdueOrders = orders.filter(o => calculateRemainingDays(o.deliveryDate, o.status).isOverdue).length;
 
@@ -237,17 +237,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition ${
                 statusFilter === 'Pendente'
-                  ? 'bg-amber-950/40 text-amber-300 font-semibold border border-amber-800/50'
+                  ? 'bg-red-950/50 text-red-300 font-semibold border border-red-800/60 shadow-xs'
                   : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
               } ${isCollapsed ? 'justify-center px-0' : ''}`}
-              title="Pedidos Pendentes"
+              title="Pedidos Pendentes (Vermelho)"
             >
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <Clock className="w-4 h-4 text-red-400 flex-shrink-0" />
                 {!isCollapsed && <span>Pendentes</span>}
               </div>
               {!isCollapsed && (
-                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800/50">
+                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-red-950 text-red-300 border border-red-800/60">
                   {pendingOrders}
                 </span>
               )}
@@ -256,22 +256,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               onClick={() => {
                 onNavigateHome();
-                onSelectStatusFilter('Pronto');
+                onSelectStatusFilter('Em Andamento');
               }}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition ${
-                statusFilter === 'Pronto'
-                  ? 'bg-emerald-950/40 text-emerald-300 font-semibold border border-emerald-800/50'
+                statusFilter === 'Em Andamento' || statusFilter === 'Pronto'
+                  ? 'bg-amber-950/50 text-amber-300 font-semibold border border-amber-800/60 shadow-xs'
                   : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
               } ${isCollapsed ? 'justify-center px-0' : ''}`}
-              title="Pedidos Prontos"
+              title="Pedidos Em Andamento (Amarelo)"
             >
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                {!isCollapsed && <span>Prontos</span>}
+                <CheckCircle2 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                {!isCollapsed && <span>Em Andamento</span>}
               </div>
               {!isCollapsed && (
-                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/50">
-                  {readyOrders}
+                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800/60">
+                  {inProgressOrders}
                 </span>
               )}
             </button>
@@ -283,17 +283,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition ${
                 statusFilter === 'Entregue'
-                  ? 'bg-slate-800 text-slate-200 font-semibold'
+                  ? 'bg-emerald-950/50 text-emerald-300 font-semibold border border-emerald-800/60 shadow-xs'
                   : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
               } ${isCollapsed ? 'justify-center px-0' : ''}`}
-              title="Pedidos Entregues"
+              title="Pedidos Entregues (Verde)"
             >
               <div className="flex items-center gap-2">
-                <Truck className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <Truck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 {!isCollapsed && <span>Entregues</span>}
               </div>
               {!isCollapsed && (
-                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/60">
                   {deliveredOrders}
                 </span>
               )}
