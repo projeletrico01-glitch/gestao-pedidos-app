@@ -32,6 +32,14 @@ export interface Environment {
   accessories: CodeItem[];
 }
 
+export interface ExcludedComponentItem {
+  code: string;
+  name: string;
+  reason?: string;
+  excludedAt?: string;
+  from?: string;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -43,6 +51,7 @@ export interface Order {
   notes: string;
   createdAt: string;
   environments: Environment[];
+  excludedComponents?: ExcludedComponentItem[];
 }
 
 export interface CatalogItem {

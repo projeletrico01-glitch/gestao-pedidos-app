@@ -31,9 +31,13 @@ import {
   FileCode,
   FileSpreadsheet,
   FileDown,
-  Upload
+  Upload,
+  Ban,
+  ShieldAlert,
+  CheckSquare,
+  Square
 } from 'lucide-react';
-import { Order, OrderStatus, Environment, Machine, CodeItem, CatalogItem } from '../types';
+import { Order, OrderStatus, Environment, Machine, CodeItem, CatalogItem, ExcludedComponentItem } from '../types';
 import { 
   calculateRemainingDays, 
   getRelativeDate, 
@@ -43,6 +47,20 @@ import {
   ImportedComponentItem
 } from '../utils/excel';
 import { NomenclatureDecoder } from './NomenclatureDecoder';
+
+export interface PreviewImportItem extends ImportedComponentItem {
+  selected: boolean;
+  wasExcluded: boolean;
+  excludedFrom?: string;
+}
+import { 
+  getBlockedMemory, 
+  saveBlockedMemory, 
+  addToBlockedMemory, 
+  removeFromBlockedMemory, 
+  clearBlockedMemory, 
+  checkIsBlocked 
+} from '../utils/blockedMemory';
 import { decodeMachineNomenclature, decodePanelNomenclature, NomenclatureResult } from '../utils/nomenclature';
 
 interface OrderDetailViewProps {
@@ -88,13 +106,26 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
   // Nomenclature decoder modal state
   const [isNomenclatureModalOpen, setIsNomenclatureModalOpen] = useState(false);
 
+  // Collapsed states for Machines, Panels and Accessories (Minimize / Expand)
+  const [collapsedMachines, setCollapsedMachines] = useState<{ [machineId: string]: boolean }>({});
+  const [collapsedPanels, setCollapsedPanels] = useState<{ [envId: string]: boolean }>({});
+  const [collapsedAccessories, setCollapsedAccessories] = useState<{ [envId: string]: boolean }>({});
+
+  // Modal to view/manage excluded components & persistent memory
+  const [isExcludedModalOpen, setIsExcludedModalOpen] = useState(false);
+  const [newExcludedCode, setNewExcludedCode] = useState('');
+  const [newExcludedName, setNewExcludedName] = useState('');
+  const [blockedMemoryList, setBlockedMemoryList] = useState<ExcludedComponentItem[]>(getBlockedMemory);
+  const [blockedSearchQuery, setBlockedSearchQuery] = useState('');
+
   // Machine & Panel Component Excel Import preview state
   const [componentImportPreview, setComponentImportPreview] = useState<{
     envIdx: number;
     mIdx?: number;
     isPanel?: boolean;
     targetTitle: string;
-    items: ImportedComponentItem[];
+    items: PreviewImportItem[];
+    filterTab: 'all' | 'ready' | 'excluded';
   } | null>(null);
 
   const machineFileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
@@ -349,6 +380,106 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     setHasUnsavedChanges(true);
   };
 
+  // Collapsed machines, panels and accessories toggles
+  const toggleMachineCollapsed = (machineId: string) => {
+    setCollapsedMachines(prev => ({
+      ...prev,
+      [machineId]: !prev[machineId]
+    }));
+  };
+
+  const toggleAllMachines = (envIdx: number) => {
+    const env = currentOrder.environments[envIdx];
+    if (!env?.machines || env.machines.length === 0) return;
+    const allCollapsed = env.machines.every(m => !!collapsedMachines[m.id]);
+    const next = { ...collapsedMachines };
+    env.machines.forEach(m => {
+      next[m.id] = !allCollapsed;
+    });
+    setCollapsedMachines(next);
+  };
+
+  const togglePanelCollapsed = (envId: string) => {
+    setCollapsedPanels(prev => ({
+      ...prev,
+      [envId]: !prev[envId]
+    }));
+  };
+
+  const toggleAccessoryCollapsed = (envId: string) => {
+    setCollapsedAccessories(prev => ({
+      ...prev,
+      [envId]: !prev[envId]
+    }));
+  };
+
+  // Excluded items & blocked memory management
+  const handleUnexcludeItem = (code: string, name: string) => {
+    // 1. Remove from global persistent memory
+    const updatedGlobal = removeFromBlockedMemory(code, name);
+    setBlockedMemoryList(updatedGlobal);
+
+    // 2. Remove from current order's list
+    const normCode = (code || '').trim().toUpperCase();
+    const normName = (name || '').trim().toLowerCase();
+    const updatedOrder = (currentOrder.excludedComponents || []).filter(ex => {
+      const exCode = (ex.code || '').trim().toUpperCase();
+      const exName = (ex.name || '').trim().toLowerCase();
+      if (normCode && exCode && normCode === exCode) return false;
+      if (normName && exName && normName === exName) return false;
+      return true;
+    });
+    setCurrentOrder(prev => ({ ...prev, excludedComponents: updatedOrder }));
+    setHasUnsavedChanges(true);
+    onShowToast(`Item [${code || name}] desbloqueado da memória! Poderá ser importado ou acrescentado novamente.`, 'success');
+  };
+
+  const handleClearAllExcluded = () => {
+    clearBlockedMemory();
+    setBlockedMemoryList([]);
+    setCurrentOrder(prev => ({ ...prev, excludedComponents: [] }));
+    setHasUnsavedChanges(true);
+    onShowToast('Memória de bloqueados totalmente limpa. Todos os itens poderão ser importados.', 'info');
+  };
+
+  const handleManualAddExcluded = () => {
+    const code = newExcludedCode.trim().toUpperCase();
+    const name = newExcludedName.trim();
+    if (!code && !name) {
+      onShowToast('Informe o código ou descrição do item para bloquear.', 'warning');
+      return;
+    }
+    const check = checkIsBlocked(code, name, currentOrder.excludedComponents);
+    if (check.isBlocked) {
+      onShowToast('Este item já está gravado na memória de bloqueados.', 'warning');
+      return;
+    }
+
+    // Add to persistent global memory
+    const updatedGlobal = addToBlockedMemory({
+      code: code || '',
+      name: name || lookupNameByCode(code) || '',
+      from: 'Bloqueio Manual'
+    });
+    setBlockedMemoryList(updatedGlobal);
+
+    // Add to order
+    const updatedOrder: ExcludedComponentItem[] = [
+      ...(currentOrder.excludedComponents || []),
+      {
+        code: code || '',
+        name: name || lookupNameByCode(code) || '',
+        from: 'Bloqueio Manual',
+        excludedAt: new Date().toISOString()
+      }
+    ];
+    setCurrentOrder(prev => ({ ...prev, excludedComponents: updatedOrder }));
+    setHasUnsavedChanges(true);
+    setNewExcludedCode('');
+    setNewExcludedName('');
+    onShowToast(`Item [${code || name}] gravado na memória de bloqueados!`, 'success');
+  };
+
   // Individual Excel import for Machine Components
   const handleImportMachineExcel = async (envIdx: number, mIdx: number, machineTitle: string, file: File) => {
     const result = await readComponentsFromExcel(file);
@@ -357,19 +488,24 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
       return;
     }
 
-    const currentItems = currentOrder.environments[envIdx]?.machines?.[mIdx]?.items || [];
-    if (currentItems.length > 0) {
-      setComponentImportPreview({
-        envIdx,
-        mIdx,
-        isPanel: false,
-        targetTitle: machineTitle || `Máquina ${mIdx + 1}`,
-        items: result.items
-      });
-    } else {
-      applyImportedComponents(envIdx, mIdx, false, result.items, false);
-      onShowToast?.(`${result.items.length} componentes importados do Excel com sucesso para ${machineTitle || 'a máquina'}!`, 'success');
-    }
+    const previewItems: PreviewImportItem[] = result.items.map(it => {
+      const check = checkIsBlocked(it.code, it.name, currentOrder.excludedComponents);
+      return {
+        ...it,
+        selected: !check.isBlocked, // Blocked items are deselected by default
+        wasExcluded: check.isBlocked,
+        excludedFrom: check.isBlocked ? (check.blockedItem?.from || 'Memória de Bloqueados') : undefined
+      };
+    });
+
+    setComponentImportPreview({
+      envIdx,
+      mIdx,
+      isPanel: false,
+      targetTitle: machineTitle || `Máquina ${mIdx + 1}`,
+      items: previewItems,
+      filterTab: 'all'
+    });
   };
 
   // Individual Excel import for Panel Components
@@ -380,18 +516,23 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
       return;
     }
 
-    const currentItems = currentOrder.environments[envIdx]?.panel?.items || [];
-    if (currentItems.length > 0) {
-      setComponentImportPreview({
-        envIdx,
-        isPanel: true,
-        targetTitle: `Quadro de Comando (${currentOrder.environments[envIdx].name})`,
-        items: result.items
-      });
-    } else {
-      applyImportedComponents(envIdx, undefined, true, result.items, false);
-      onShowToast?.(`${result.items.length} componentes elétricos importados do Excel com sucesso para o quadro!`, 'success');
-    }
+    const previewItems: PreviewImportItem[] = result.items.map(it => {
+      const check = checkIsBlocked(it.code, it.name, currentOrder.excludedComponents);
+      return {
+        ...it,
+        selected: !check.isBlocked,
+        wasExcluded: check.isBlocked,
+        excludedFrom: check.isBlocked ? (check.blockedItem?.from || 'Memória de Bloqueados') : undefined
+      };
+    });
+
+    setComponentImportPreview({
+      envIdx,
+      isPanel: true,
+      targetTitle: `Quadro de Comando (${currentOrder.environments[envIdx].name})`,
+      items: previewItems,
+      filterTab: 'all'
+    });
   };
 
   // Apply imported items from Excel (Append or Replace)
@@ -399,14 +540,48 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     envIdx: number,
     mIdx: number | undefined,
     isPanel: boolean | undefined,
-    newItems: ImportedComponentItem[],
+    previewItems: PreviewImportItem[],
     replace: boolean
   ) => {
     const updated = [...currentOrder.environments];
     const env = updated[envIdx];
     if (!env) return;
 
-    const formatted: CodeItem[] = newItems.map(it => ({
+    // Filter only selected items
+    const selectedItems = previewItems.filter(it => it.selected);
+
+    // Any items that were not selected in this import are registered into excludedComponents
+    // AND into the persistent global blocked memory so they are remembered across orders/lists
+    let newExcluded = [...(currentOrder.excludedComponents || [])];
+    previewItems.forEach(it => {
+      if (!it.selected) {
+        const normCode = it.code?.trim().toUpperCase();
+        const normName = it.name?.trim();
+        if (normCode || normName) {
+          addToBlockedMemory({
+            code: normCode,
+            name: normName,
+            from: isPanel ? `Quadro (${env.name})` : `Máquina (${env.name})`
+          });
+
+          const already = newExcluded.some(ex => 
+            (normCode && ex.code.toUpperCase() === normCode) ||
+            (normName && ex.name.toLowerCase() === normName.toLowerCase())
+          );
+          if (!already) {
+            newExcluded.push({
+              code: normCode || '',
+              name: normName || '',
+              from: isPanel ? `Quadro (${env.name})` : `Máquina (${env.name})`,
+              excludedAt: new Date().toISOString()
+            });
+          }
+        }
+      }
+    });
+    setBlockedMemoryList(getBlockedMemory());
+
+    const formatted: CodeItem[] = selectedItems.map(it => ({
       code: it.code,
       name: it.name,
       quantity: it.quantity || 1
@@ -428,9 +603,19 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
       }
     }
 
-    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    const blockedCount = previewItems.length - selectedItems.length;
+    setCurrentOrder(prev => ({ ...prev, environments: updated, excludedComponents: newExcluded }));
     setHasUnsavedChanges(true);
     setComponentImportPreview(null);
+
+    if (blockedCount > 0) {
+      onShowToast(
+        `${selectedItems.length} componente(s) importado(s). ${blockedCount} item(ns) excluído(s) foram bloqueados e não entraram na lista.`,
+        'success'
+      );
+    } else {
+      onShowToast(`${selectedItems.length} componentes importados com sucesso!`, 'success');
+    }
   };
 
   const handleQuickAddMachineItem = (envIdx: number, mIdx: number, machineId: string) => {
@@ -442,6 +627,16 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     }
     const upperCode = rawCode.toUpperCase();
     const name = lookupNameByCode(upperCode) || '';
+
+    // Impedir de acrescentar item bloqueado na memória
+    const check = checkIsBlocked(upperCode, name, currentOrder.excludedComponents);
+    if (check.isBlocked) {
+      onShowToast(
+        `🚫 Bloqueado: [${upperCode}] está na Memória de Bloqueados e não pode ser acrescentado. Desbloqueie-o na barra superior se desejar utilizá-lo.`,
+        'error'
+      );
+      return;
+    }
 
     const updated = [...currentOrder.environments];
     if (!updated[envIdx].machines[mIdx].items) updated[envIdx].machines[mIdx].items = [];
@@ -460,9 +655,50 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
   const handleRemoveMachineItem = (envIdx: number, mIdx: number, iIdx: number) => {
     const updated = [...currentOrder.environments];
-    updated[envIdx].machines[mIdx].items.splice(iIdx, 1);
-    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+    const machine = updated[envIdx].machines[mIdx];
+    const item = machine?.items?.[iIdx];
+    if (!item) return;
+
+    machine.items.splice(iIdx, 1);
+
+    const code = item.code?.trim().toUpperCase();
+    const name = item.name?.trim();
+
+    // 1. Grava na Memória Global Persistente dos Bloqueados (impede futuras adições/importações)
+    if (code || name) {
+      addToBlockedMemory({
+        code: code || '',
+        name: name || '',
+        from: `${machine.name || `Máquina ${mIdx + 1}`} (${updated[envIdx].name})`
+      });
+      setBlockedMemoryList(getBlockedMemory());
+    }
+
+    // 2. Grava na lista do pedido
+    let newExcluded = [...(currentOrder.excludedComponents || [])];
+    if (code || name) {
+      const exists = newExcluded.some(ex => 
+        (code && ex.code.toUpperCase() === code) ||
+        (name && ex.name.toLowerCase() === name.toLowerCase())
+      );
+      if (!exists) {
+        newExcluded.push({
+          code: code || '',
+          name: name || '',
+          from: `${machine.name || `Máquina ${mIdx + 1}`} (${updated[envIdx].name})`,
+          excludedAt: new Date().toISOString()
+        });
+      }
+    }
+
+    setCurrentOrder(prev => ({ ...prev, environments: updated, excludedComponents: newExcluded }));
     setHasUnsavedChanges(true);
+    onShowToast(
+      code 
+        ? `Item [${code}] excluído e salvo na memória de bloqueados: impedido de ser importado ou acrescentado em outras listas.` 
+        : 'Item excluído da lista.',
+      'info'
+    );
   };
 
   const handleMachineItemCodeChange = (envIdx: number, mIdx: number, iIdx: number, rawCode: string) => {
@@ -523,6 +759,16 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     const upperCode = rawCode.toUpperCase();
     const name = lookupNameByCode(upperCode) || '';
 
+    // Impedir de acrescentar item bloqueado na memória
+    const check = checkIsBlocked(upperCode, name, currentOrder.excludedComponents);
+    if (check.isBlocked) {
+      onShowToast(
+        `🚫 Bloqueado: [${upperCode}] está na Memória de Bloqueados e não pode ser acrescentado ao quadro. Desbloqueie-o primeiro se desejar utilizá-lo.`,
+        'error'
+      );
+      return;
+    }
+
     const updated = [...currentOrder.environments];
     if (!updated[envIdx].panel) updated[envIdx].panel = { description: '', items: [] };
     if (!updated[envIdx].panel.items) updated[envIdx].panel.items = [];
@@ -541,9 +787,49 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
   const handleRemovePanelItem = (envIdx: number, pIdx: number) => {
     const updated = [...currentOrder.environments];
+    const item = updated[envIdx].panel?.items?.[pIdx];
+    if (!item) return;
+
     updated[envIdx].panel.items.splice(pIdx, 1);
-    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+
+    const code = item.code?.trim().toUpperCase();
+    const name = item.name?.trim();
+
+    // 1. Grava na Memória Global Persistente dos Bloqueados
+    if (code || name) {
+      addToBlockedMemory({
+        code: code || '',
+        name: name || '',
+        from: `Quadro de Comando (${updated[envIdx].name})`
+      });
+      setBlockedMemoryList(getBlockedMemory());
+    }
+
+    // 2. Grava na lista do pedido
+    let newExcluded = [...(currentOrder.excludedComponents || [])];
+    if (code || name) {
+      const exists = newExcluded.some(ex => 
+        (code && ex.code.toUpperCase() === code) ||
+        (name && ex.name.toLowerCase() === name.toLowerCase())
+      );
+      if (!exists) {
+        newExcluded.push({
+          code: code || '',
+          name: name || '',
+          from: `Quadro de Comando (${updated[envIdx].name})`,
+          excludedAt: new Date().toISOString()
+        });
+      }
+    }
+
+    setCurrentOrder(prev => ({ ...prev, environments: updated, excludedComponents: newExcluded }));
     setHasUnsavedChanges(true);
+    onShowToast(
+      code 
+        ? `Componente elétrico [${code}] excluído e salvo na memória de bloqueados.` 
+        : 'Componente elétrico excluído.',
+      'info'
+    );
   };
 
   const handlePanelItemCodeChange = (envIdx: number, pIdx: number, rawCode: string) => {
@@ -594,6 +880,16 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
     const upperCode = rawCode.toUpperCase();
     const name = lookupNameByCode(upperCode) || '';
 
+    // Impedir de acrescentar item bloqueado na memória
+    const check = checkIsBlocked(upperCode, name, currentOrder.excludedComponents);
+    if (check.isBlocked) {
+      onShowToast(
+        `🚫 Bloqueado: [${upperCode}] está na Memória de Bloqueados e não pode ser acrescentado. Desbloqueie-o se desejar utilizá-lo.`,
+        'error'
+      );
+      return;
+    }
+
     const updated = [...currentOrder.environments];
     if (!updated[envIdx].accessories) updated[envIdx].accessories = [];
     updated[envIdx].accessories.push({
@@ -611,9 +907,47 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
   const handleRemoveAccessory = (envIdx: number, aIdx: number) => {
     const updated = [...currentOrder.environments];
+    const item = updated[envIdx].accessories?.[aIdx];
+    if (!item) return;
+
     updated[envIdx].accessories.splice(aIdx, 1);
-    setCurrentOrder(prev => ({ ...prev, environments: updated }));
+
+    const code = item.code?.trim().toUpperCase();
+    const name = item.name?.trim();
+
+    // 1. Grava na Memória Global Persistente dos Bloqueados
+    if (code || name) {
+      addToBlockedMemory({
+        code: code || '',
+        name: name || '',
+        from: `Acessórios (${updated[envIdx].name})`
+      });
+      setBlockedMemoryList(getBlockedMemory());
+    }
+
+    // 2. Grava na lista do pedido
+    let newExcluded = [...(currentOrder.excludedComponents || [])];
+    if (code || name) {
+      const exists = newExcluded.some(ex => 
+        (code && ex.code.toUpperCase() === code) ||
+        (name && ex.name.toLowerCase() === name.toLowerCase())
+      );
+      if (!exists) {
+        newExcluded.push({
+          code: code || '',
+          name: name || '',
+          from: `Acessórios (${updated[envIdx].name})`,
+          excludedAt: new Date().toISOString()
+        });
+      }
+    }
+
+    setCurrentOrder(prev => ({ ...prev, environments: updated, excludedComponents: newExcluded }));
     setHasUnsavedChanges(true);
+    onShowToast(
+      code ? `Acessório [${code}] excluído e salvo na memória de bloqueados.` : 'Acessório excluído.',
+      'info'
+    );
   };
 
   const handleAccessoryCodeChange = (envIdx: number, aIdx: number, rawCode: string) => {
@@ -712,6 +1046,23 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           >
             <BookMarked className="w-4 h-4 text-amber-600" />
             <span>Ver Catálogo</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setBlockedMemoryList(getBlockedMemory());
+              setIsExcludedModalOpen(true);
+            }}
+            className={`px-3 py-2 text-xs font-semibold rounded-xl border transition flex items-center gap-1.5 shadow-xs ${
+              blockedMemoryList.length > 0 || (currentOrder.excludedComponents || []).length > 0
+                ? 'bg-rose-50 hover:bg-rose-100 text-rose-900 border-rose-300 font-bold'
+                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+            }`}
+            title="Abrir a Memória de Itens Bloqueados (impede que itens excluídos sejam importados ou acrescentados em outras listas)"
+          >
+            <Ban className="w-4 h-4 text-rose-600" />
+            <span>Memória Bloqueados ({Math.max(blockedMemoryList.length, (currentOrder.excludedComponents || []).length)})</span>
           </button>
 
           <button
@@ -1209,19 +1560,41 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                   
                   {/* SECTION 1: MÁQUINAS */}
                   <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2 mb-3">
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                         <Fan className="w-4 h-4 text-blue-600" />
                         <span>Máquinas & Componentes</span>
                       </h4>
-                      <button
-                        type="button"
-                        onClick={() => handleAddMachine(envIdx)}
-                        className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-blue-50 text-blue-700 border border-slate-200 rounded-lg transition flex items-center gap-1 shadow-xs"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Nova Máquina</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {env.machines && env.machines.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => toggleAllMachines(envIdx)}
+                            className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg transition flex items-center gap-1.5 shadow-xs"
+                            title="Minimizar ou expandir componentes de todas as máquinas deste ambiente"
+                          >
+                            {env.machines.every(m => !!collapsedMachines[m.id]) ? (
+                              <>
+                                <ChevronDown className="w-3.5 h-3.5 text-blue-600" />
+                                <span>Expandir Todas</span>
+                              </>
+                            ) : (
+                              <>
+                                <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Minimizar Todas</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleAddMachine(envIdx)}
+                          className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-blue-50 text-blue-700 border border-slate-200 rounded-lg transition flex items-center gap-1 shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Nova Máquina</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-5">
@@ -1275,18 +1648,70 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                                 />
                               </div>
 
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveMachine(envIdx, mIdx)}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition self-end sm:self-center"
-                                title="Remover Máquina"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              <div className="flex items-center gap-1.5 self-end sm:self-center">
+                                {/* Component count badge */}
+                                <div 
+                                  className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-800 text-xs font-bold rounded-lg border border-blue-200"
+                                  title="Quantidade de componentes cadastrados nesta máquina"
+                                >
+                                  <span>{machine.items?.length || 0} componentes</span>
+                                </div>
+
+                                {/* Minimize / Expand Toggle Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleMachineCollapsed(machine.id)}
+                                  className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition flex items-center gap-1.5 shadow-xs ${
+                                    collapsedMachines[machine.id]
+                                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-500'
+                                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                                  }`}
+                                  title={collapsedMachines[machine.id] ? "Expandir lista de componentes" : "Minimizar componentes (deixar apenas o modelo da máquina visível)"}
+                                >
+                                  {collapsedMachines[machine.id] ? (
+                                    <>
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                      <span>Expandir</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                                      <span>Minimizar</span>
+                                    </>
+                                  )}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMachine(envIdx, mIdx)}
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                  title="Remover Máquina"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
 
-                            {/* Machine Components Sub-List */}
-                            <div className="pl-2 sm:pl-4 border-l-2 border-blue-400 space-y-3">
+                            {/* Collapsed State Bar (Only Machine Model Visible) */}
+                            {collapsedMachines[machine.id] ? (
+                              <div
+                                onClick={() => toggleMachineCollapsed(machine.id)}
+                                className="cursor-pointer text-xs text-slate-600 hover:text-blue-700 hover:bg-blue-50/50 p-3 bg-slate-50 rounded-xl border border-dashed border-slate-300 transition flex items-center justify-between"
+                                title="Clique para expandir e editar os componentes desta máquina"
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <span className="font-bold text-slate-800">Modelo: {machine.name || 'Sem especificação'}</span>
+                                  <span className="text-slate-300">•</span>
+                                  <span className="text-slate-500">{machine.items?.length || 0} componente(s) cadastrado(s) (minimizados)</span>
+                                </div>
+                                <span className="text-blue-600 font-bold flex items-center gap-1 text-xs">
+                                  <span>Ver / Editar Componentes</span>
+                                  <ChevronDown className="w-4 h-4" />
+                                </span>
+                              </div>
+                            ) : (
+                              /* Machine Components Sub-List */
+                              <div className="pl-2 sm:pl-4 border-l-2 border-blue-400 space-y-3">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                 <div>
                                   <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2">
@@ -1505,6 +1930,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                                 )}
                               </div>
                             </div>
+                            )}
                           </div>
                         ))
                       )}
@@ -1513,103 +1939,380 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
                   {/* SECTION 2: QUADRO DE COMANDO */}
                   <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-200 pb-2 mb-3">
-                      <Cpu className="w-4 h-4 text-amber-500" />
-                      <span>Quadro de Comando do Ambiente</span>
-                    </h4>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 mb-3">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <Cpu className="w-4 h-4 text-amber-500" />
+                        <span>Quadro de Comando do Ambiente</span>
+                        <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full lowercase">
+                          {env.panel?.items?.length || 0} componentes
+                        </span>
+                      </h4>
 
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Especificação Geral do Quadro
-                        </label>
-                        <input
-                          type="text"
-                          value={env.panel?.description || ''}
-                          onChange={e => handleUpdatePanelDesc(envIdx, e.target.value)}
-                          placeholder="Ex: Quadro Trifásico 380V c/ Partida Direta + Módulo CLP Siemens"
-                          className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        />
+                      <button
+                        type="button"
+                        onClick={() => togglePanelCollapsed(env.id)}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition flex items-center gap-1.5 shadow-xs ${
+                          collapsedPanels[env.id]
+                            ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-500'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        }`}
+                        title={collapsedPanels[env.id] ? "Expandir componentes do quadro de comando" : "Minimizar componentes do quadro de comando"}
+                      >
+                        {collapsedPanels[env.id] ? (
+                          <>
+                            <ChevronDown className="w-3.5 h-3.5" />
+                            <span>Expandir Quadro</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Minimizar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Collapsed State Bar (Only Quadro General Spec & Count Visible) */}
+                    {collapsedPanels[env.id] ? (
+                      <div
+                        onClick={() => togglePanelCollapsed(env.id)}
+                        className="cursor-pointer text-xs text-slate-600 hover:text-amber-800 hover:bg-amber-50/50 p-3 bg-white rounded-xl border border-dashed border-amber-300 transition flex items-center justify-between shadow-xs"
+                        title="Clique para expandir e editar os componentes do quadro de comando"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2.5">
+                          <span className="font-bold text-slate-800">
+                            Especificação: {env.panel?.description || 'Quadro Elétrico Padrão (Sem especificação descrita)'}
+                          </span>
+                          <span className="hidden sm:inline text-slate-300">•</span>
+                          <span className="text-slate-500">
+                            {env.panel?.items?.length || 0} componente(s) elétrico(s) (minimizados)
+                          </span>
+                        </div>
+                        <span className="text-amber-700 font-bold flex items-center gap-1 text-xs flex-shrink-0">
+                          <span>Ver / Editar Componentes</span>
+                          <ChevronDown className="w-4 h-4" />
+                        </span>
                       </div>
-
-                      <div className="bg-white border border-slate-200 p-4 rounded-xl space-y-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div>
-                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                              Componentes do Quadro
-                            </span>
-                            <span className="text-[11px] text-slate-500 block">
-                              Disjuntores, contatores, relés, CLP, bornes com suas quantidades
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
-                            {/* Hidden file input for this panel */}
-                            <input
-                              type="file"
-                              ref={el => { panelFileInputRefs.current[env.id] = el; }}
-                              accept=".xlsx,.xls,.csv"
-                              className="hidden"
-                              onChange={e => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  handleImportPanelExcel(envIdx, file);
-                                  e.target.value = '';
-                                }
-                              }}
-                            />
-
-                            <button
-                              type="button"
-                              onClick={() => panelFileInputRefs.current[env.id]?.click()}
-                              className="text-xs text-amber-850 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1.5 shadow-xs active:scale-95 text-amber-900"
-                              title="Importar planilha Excel individual com Código (Ref) e Descrição para este quadro"
-                            >
-                              <FileSpreadsheet className="w-3.5 h-3.5 text-amber-600" />
-                              <span>Importar Excel</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => downloadComponentsTemplate('quadro')}
-                              className="px-2 py-1 text-xs text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-medium transition flex items-center gap-1 shadow-xs"
-                              title="Baixar planilha modelo Excel (.xlsx) com colunas Código (Ref) e Descrição"
-                            >
-                              <FileDown className="w-3.5 h-3.5 text-slate-500" />
-                              <span className="hidden md:inline">Modelo</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleAddPanelItem(envIdx)}
-                              className="text-xs text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>+ Linha</span>
-                            </button>
-                          </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Especificação Geral do Quadro
+                          </label>
+                          <input
+                            type="text"
+                            value={env.panel?.description || ''}
+                            onChange={e => handleUpdatePanelDesc(envIdx, e.target.value)}
+                            placeholder="Ex: Quadro Trifásico 380V c/ Partida Direta + Módulo CLP Siemens"
+                            className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          />
                         </div>
 
-                        {/* Quick Add Bar with Quantity for Panel */}
-                        <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
-                          <span className="text-[11px] font-bold text-amber-900 uppercase">Adicionar Rápido:</span>
+                        <div className="bg-white border border-slate-200 p-4 rounded-xl space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                                Componentes do Quadro
+                              </span>
+                              <span className="text-[11px] text-slate-500 block">
+                                Disjuntores, contatores, relés, CLP, bornes com suas quantidades
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto">
+                              {/* Hidden file input for this panel */}
+                              <input
+                                type="file"
+                                ref={el => { panelFileInputRefs.current[env.id] = el; }}
+                                accept=".xlsx,.xls,.csv"
+                                className="hidden"
+                                onChange={e => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleImportPanelExcel(envIdx, file);
+                                    e.target.value = '';
+                                  }
+                                }}
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() => panelFileInputRefs.current[env.id]?.click()}
+                                className="text-xs text-amber-850 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1.5 shadow-xs active:scale-95 text-amber-900"
+                                title="Importar planilha Excel individual com Código (Ref) e Descrição para este quadro"
+                              >
+                                <FileSpreadsheet className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Importar Excel</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => downloadComponentsTemplate('quadro')}
+                                className="px-2 py-1 text-xs text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-medium transition flex items-center gap-1 shadow-xs"
+                                title="Baixar planilha modelo Excel (.xlsx) com colunas Código (Ref) e Descrição"
+                              >
+                                <FileDown className="w-3.5 h-3.5 text-slate-500" />
+                                <span className="hidden md:inline">Modelo</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleAddPanelItem(envIdx)}
+                                className="text-xs text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>+ Linha</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Quick Add Bar with Quantity for Panel */}
+                          <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
+                            <span className="text-[11px] font-bold text-amber-900 uppercase">Adicionar Rápido:</span>
+                            
+                            <div className="w-40 sm:w-48 flex-grow">
+                              <input
+                                type="text"
+                                list="catalogDatalist"
+                                value={quickPanelCode[env.id] || ''}
+                                onChange={e => setQuickPanelCode(prev => ({ ...prev, [env.id]: e.target.value }))}
+                                placeholder="Código (ex: DISJ-32)"
+                                className="w-full border border-amber-300 rounded-lg px-2.5 py-1 text-xs font-bold uppercase text-amber-900 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <span className="text-[11px] font-bold text-amber-900">Qtd:</span>
+                              <div className="flex items-center border border-amber-300 rounded-lg bg-white overflow-hidden shadow-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => setQuickPanelQty(prev => ({ ...prev, [env.id]: Math.max(1, (prev[env.id] || 1) - 1) }))}
+                                  className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={quickPanelQty[env.id] ?? 1}
+                                  onChange={e => setQuickPanelQty(prev => ({ ...prev, [env.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                  className="w-10 border-x border-amber-200 py-0.5 text-xs font-bold text-center text-slate-900 focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setQuickPanelQty(prev => ({ ...prev, [env.id]: (prev[env.id] || 1) + 1 }))}
+                                  className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleQuickAddPanelItem(envIdx, env.id)}
+                              className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Adicionar ao Quadro</span>
+                            </button>
+                          </div>
+
+                          {/* Panel Table Headers */}
+                          {env.panel?.items && env.panel.items.length > 0 && (
+                            <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                              <div className="col-span-3">Código (Ref)</div>
+                              <div className="col-span-5">Descrição do Componente Elétrico</div>
+                              <div className="col-span-3 text-center">Quantidade (Qtd)</div>
+                              <div className="col-span-1 text-right">Ação</div>
+                            </div>
+                          )}
+
+                          {/* Panel Items Rows */}
+                          <div className="space-y-2">
+                            {(!env.panel?.items || env.panel.items.length === 0) ? (
+                              <p className="text-xs text-slate-400 italic py-1">Nenhum componente elétrico cadastrado para este quadro.</p>
+                            ) : (
+                              env.panel.items.map((pItem, pIdx) => {
+                                const isInCatalog = catalog.some(c => c.code.toUpperCase() === (pItem.code || '').trim().toUpperCase());
+
+                                return (
+                                  <div
+                                    key={pIdx}
+                                    className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50/90 border border-slate-200 p-2 rounded-xl transition hover:border-slate-300"
+                                  >
+                                    {/* Code Input */}
+                                    <div className="w-full sm:w-36 md:w-44 flex-shrink-0">
+                                      <input
+                                        type="text"
+                                        list="catalogDatalist"
+                                        value={pItem.code}
+                                        onChange={e => handlePanelItemCodeChange(envIdx, pIdx, e.target.value)}
+                                        placeholder="Código (ex: DISJ-32)"
+                                        className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold uppercase text-amber-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                      />
+                                    </div>
+
+                                    {/* Description Input */}
+                                    <div className="flex-grow">
+                                      <input
+                                        type="text"
+                                        value={pItem.name}
+                                        onChange={e => handlePanelItemNameChange(envIdx, pIdx, e.target.value)}
+                                        placeholder="Descrição do componente elétrico"
+                                        className="w-full border border-slate-200 bg-white rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                      />
+                                    </div>
+
+                                    {/* Quantity Stepper Input */}
+                                    <div className="flex items-center justify-between sm:justify-start gap-1.5 flex-shrink-0">
+                                      <span className="text-[10px] font-bold text-slate-500 uppercase sm:hidden">Qtd:</span>
+                                      <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-xs">
+                                        <button
+                                          type="button"
+                                          onClick={() => handlePanelItemQtyChange(envIdx, pIdx, Math.max(1, (pItem.quantity || 1) - 1))}
+                                          className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
+                                          title="Diminuir quantidade"
+                                        >
+                                          <Minus className="w-3 h-3" />
+                                        </button>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          value={pItem.quantity ?? 1}
+                                          onChange={e => handlePanelItemQtyChange(envIdx, pIdx, parseInt(e.target.value) || 1)}
+                                          title="Quantidade do componente"
+                                          className="w-12 text-center text-xs font-bold text-slate-900 border-x border-slate-200 py-1 focus:outline-none focus:bg-amber-50"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handlePanelItemQtyChange(envIdx, pIdx, (pItem.quantity || 1) + 1)}
+                                          className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
+                                          title="Aumentar quantidade"
+                                        >
+                                          <Plus className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-1 justify-end flex-shrink-0">
+                                      {pItem.code && pItem.name && !isInCatalog && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleQuickSaveCatalog(pItem.code, pItem.name)}
+                                          className="px-2 py-1 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-semibold transition flex items-center gap-1 flex-shrink-0"
+                                          title="Salvar este código e nome no catálogo geral"
+                                        >
+                                          <Sparkles className="w-3 h-3 text-amber-600" />
+                                          <span className="hidden md:inline">+ Catálogo</span>
+                                        </button>
+                                      )}
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemovePanelItem(envIdx, pIdx)}
+                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                        title="Remover Componente"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SECTION 3: ACESSÓRIOS */}
+                  <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 mb-3">
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <Plug className="w-4 h-4 text-emerald-600" />
+                        <span>Acessórios & Periféricos</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full lowercase">
+                          {env.accessories?.length || 0} itens
+                        </span>
+                      </h4>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccessoryCollapsed(env.id)}
+                          className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition flex items-center gap-1.5 shadow-xs ${
+                            collapsedAccessories[env.id]
+                              ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-500'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                          }`}
+                          title={collapsedAccessories[env.id] ? "Expandir lista de acessórios" : "Minimizar lista de acessórios"}
+                        >
+                          {collapsedAccessories[env.id] ? (
+                            <>
+                              <ChevronDown className="w-3.5 h-3.5" />
+                              <span>Expandir Acessórios</span>
+                            </>
+                          ) : (
+                            <>
+                              <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Minimizar</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddAccessory(envIdx)}
+                          className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-emerald-50 text-emerald-700 border border-slate-200 rounded-lg transition flex items-center gap-1 shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Linha</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Collapsed State Bar (Only Accessories Count Visible) */}
+                    {collapsedAccessories[env.id] ? (
+                      <div
+                        onClick={() => toggleAccessoryCollapsed(env.id)}
+                        className="cursor-pointer text-xs text-slate-600 hover:text-emerald-800 hover:bg-emerald-50/50 p-3 bg-white rounded-xl border border-dashed border-emerald-300 transition flex items-center justify-between shadow-xs"
+                        title="Clique para expandir e editar os acessórios deste ambiente"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-bold text-slate-800">
+                            {env.accessories?.length || 0} acessório(s) / periférico(s) cadastrado(s) (minimizados)
+                          </span>
+                        </div>
+                        <span className="text-emerald-700 font-bold flex items-center gap-1 text-xs flex-shrink-0">
+                          <span>Ver / Editar Acessórios</span>
+                          <ChevronDown className="w-4 h-4" />
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {/* Quick Add Bar with Quantity for Accessories */}
+                        <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-bold text-emerald-900 uppercase">Adicionar Rápido:</span>
                           
                           <div className="w-40 sm:w-48 flex-grow">
                             <input
                               type="text"
                               list="catalogDatalist"
-                              value={quickPanelCode[env.id] || ''}
-                              onChange={e => setQuickPanelCode(prev => ({ ...prev, [env.id]: e.target.value }))}
-                              placeholder="Código (ex: DISJ-32)"
-                              className="w-full border border-amber-300 rounded-lg px-2.5 py-1 text-xs font-bold uppercase text-amber-900 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              value={quickAccCode[env.id] || ''}
+                              onChange={e => setQuickAccCode(prev => ({ ...prev, [env.id]: e.target.value }))}
+                              placeholder="Código (ex: SENS-NTC)"
+                              className="w-full border border-emerald-300 rounded-lg px-2.5 py-1 text-xs font-bold uppercase text-emerald-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
                           </div>
 
                           <div className="flex items-center gap-1">
-                            <span className="text-[11px] font-bold text-amber-900">Qtd:</span>
-                            <div className="flex items-center border border-amber-300 rounded-lg bg-white overflow-hidden shadow-xs">
+                            <span className="text-[11px] font-bold text-emerald-900">Qtd:</span>
+                            <div className="flex items-center border border-emerald-300 rounded-lg bg-white overflow-hidden shadow-xs">
                               <button
                                 type="button"
-                                onClick={() => setQuickPanelQty(prev => ({ ...prev, [env.id]: Math.max(1, (prev[env.id] || 1) - 1) }))}
+                                onClick={() => setQuickAccQty(prev => ({ ...prev, [env.id]: Math.max(1, (prev[env.id] || 1) - 1) }))}
                                 className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
                               >
                                 -
@@ -1617,13 +2320,13 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                               <input
                                 type="number"
                                 min="1"
-                                value={quickPanelQty[env.id] ?? 1}
-                                onChange={e => setQuickPanelQty(prev => ({ ...prev, [env.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
-                                className="w-10 border-x border-amber-200 py-0.5 text-xs font-bold text-center text-slate-900 focus:outline-none"
+                                value={quickAccQty[env.id] ?? 1}
+                                onChange={e => setQuickAccQty(prev => ({ ...prev, [env.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
+                                className="w-10 border-x border-emerald-200 py-0.5 text-xs font-bold text-center text-slate-900 focus:outline-none"
                               />
                               <button
                                 type="button"
-                                onClick={() => setQuickPanelQty(prev => ({ ...prev, [env.id]: (prev[env.id] || 1) + 1 }))}
+                                onClick={() => setQuickAccQty(prev => ({ ...prev, [env.id]: (prev[env.id] || 1) + 1 }))}
                                 className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
                               >
                                 +
@@ -1633,46 +2336,46 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
                           <button
                             type="button"
-                            onClick={() => handleQuickAddPanelItem(envIdx, env.id)}
-                            className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
+                            onClick={() => handleQuickAddAccessory(envIdx, env.id)}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
                           >
                             <Plus className="w-3.5 h-3.5" />
-                            <span>Adicionar ao Quadro</span>
+                            <span>Adicionar Acessório</span>
                           </button>
                         </div>
 
-                        {/* Panel Table Headers */}
-                        {env.panel?.items && env.panel.items.length > 0 && (
+                        {/* Accessories Table Headers */}
+                        {env.accessories && env.accessories.length > 0 && (
                           <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                             <div className="col-span-3">Código (Ref)</div>
-                            <div className="col-span-5">Descrição do Componente Elétrico</div>
+                            <div className="col-span-5">Descrição do Acessório / Periférico</div>
                             <div className="col-span-3 text-center">Quantidade (Qtd)</div>
                             <div className="col-span-1 text-right">Ação</div>
                           </div>
                         )}
 
-                        {/* Panel Items Rows */}
+                        {/* Accessories Rows */}
                         <div className="space-y-2">
-                          {(!env.panel?.items || env.panel.items.length === 0) ? (
-                            <p className="text-xs text-slate-400 italic py-1">Nenhum componente elétrico cadastrado para este quadro.</p>
+                          {(!env.accessories || env.accessories.length === 0) ? (
+                            <p className="text-xs text-slate-400 italic py-1">Nenhum acessório adicional cadastrado para este ambiente.</p>
                           ) : (
-                            env.panel.items.map((pItem, pIdx) => {
-                              const isInCatalog = catalog.some(c => c.code.toUpperCase() === (pItem.code || '').trim().toUpperCase());
+                            env.accessories.map((acc, aIdx) => {
+                              const isInCatalog = catalog.some(c => c.code.toUpperCase() === (acc.code || '').trim().toUpperCase());
 
                               return (
                                 <div
-                                  key={pIdx}
-                                  className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-50/90 border border-slate-200 p-2 rounded-xl transition hover:border-slate-300"
+                                  key={aIdx}
+                                  className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white border border-slate-200 p-2 rounded-xl transition hover:border-slate-300"
                                 >
                                   {/* Code Input */}
                                   <div className="w-full sm:w-36 md:w-44 flex-shrink-0">
                                     <input
                                       type="text"
                                       list="catalogDatalist"
-                                      value={pItem.code}
-                                      onChange={e => handlePanelItemCodeChange(envIdx, pIdx, e.target.value)}
-                                      placeholder="Código (ex: DISJ-32)"
-                                      className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold uppercase text-amber-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                      value={acc.code}
+                                      onChange={e => handleAccessoryCodeChange(envIdx, aIdx, e.target.value)}
+                                      placeholder="Código (ex: SENS-NTC)"
+                                      className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold uppercase text-emerald-700 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                     />
                                   </div>
 
@@ -1680,10 +2383,10 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                                   <div className="flex-grow">
                                     <input
                                       type="text"
-                                      value={pItem.name}
-                                      onChange={e => handlePanelItemNameChange(envIdx, pIdx, e.target.value)}
-                                      placeholder="Descrição do componente elétrico"
-                                      className="w-full border border-slate-200 bg-white rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                      value={acc.name}
+                                      onChange={e => handleAccessoryNameChange(envIdx, aIdx, e.target.value)}
+                                      placeholder="Descrição do acessório ou periférico"
+                                      className="w-full border border-slate-200 bg-slate-50 focus:bg-white rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                     />
                                   </div>
 
@@ -1693,7 +2396,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                                     <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-xs">
                                       <button
                                         type="button"
-                                        onClick={() => handlePanelItemQtyChange(envIdx, pIdx, Math.max(1, (pItem.quantity || 1) - 1))}
+                                        onClick={() => handleAccessoryQtyChange(envIdx, aIdx, Math.max(1, (acc.quantity || 1) - 1))}
                                         className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
                                         title="Diminuir quantidade"
                                       >
@@ -1702,14 +2405,14 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                                       <input
                                         type="number"
                                         min="1"
-                                        value={pItem.quantity ?? 1}
-                                        onChange={e => handlePanelItemQtyChange(envIdx, pIdx, parseInt(e.target.value) || 1)}
-                                        title="Quantidade do componente"
-                                        className="w-12 text-center text-xs font-bold text-slate-900 border-x border-slate-200 py-1 focus:outline-none focus:bg-amber-50"
+                                        value={acc.quantity ?? 1}
+                                        onChange={e => handleAccessoryQtyChange(envIdx, aIdx, parseInt(e.target.value) || 1)}
+                                        title="Quantidade do acessório"
+                                        className="w-12 text-center text-xs font-bold text-slate-900 border-x border-slate-200 py-1 focus:outline-none focus:bg-emerald-50"
                                       />
                                       <button
                                         type="button"
-                                        onClick={() => handlePanelItemQtyChange(envIdx, pIdx, (pItem.quantity || 1) + 1)}
+                                        onClick={() => handleAccessoryQtyChange(envIdx, aIdx, (acc.quantity || 1) + 1)}
                                         className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
                                         title="Aumentar quantidade"
                                       >
@@ -1720,10 +2423,10 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
                                   {/* Actions */}
                                   <div className="flex items-center gap-1 justify-end flex-shrink-0">
-                                    {pItem.code && pItem.name && !isInCatalog && (
+                                    {acc.code && acc.name && !isInCatalog && (
                                       <button
                                         type="button"
-                                        onClick={() => handleQuickSaveCatalog(pItem.code, pItem.name)}
+                                        onClick={() => handleQuickSaveCatalog(acc.code, acc.name)}
                                         className="px-2 py-1 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-semibold transition flex items-center gap-1 flex-shrink-0"
                                         title="Salvar este código e nome no catálogo geral"
                                       >
@@ -1734,9 +2437,9 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
                                     <button
                                       type="button"
-                                      onClick={() => handleRemovePanelItem(envIdx, pIdx)}
+                                      onClick={() => handleRemoveAccessory(envIdx, aIdx)}
                                       className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                                      title="Remover Componente"
+                                      title="Remover Acessório"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -1747,185 +2450,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                           )}
                         </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* SECTION 3: ACESSÓRIOS */}
-                  <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
-                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                        <Plug className="w-4 h-4 text-emerald-600" />
-                        <span>Acessórios & Periféricos</span>
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={() => handleAddAccessory(envIdx)}
-                        className="px-2.5 py-1 text-xs font-semibold bg-white hover:bg-emerald-50 text-emerald-700 border border-slate-200 rounded-lg transition flex items-center gap-1 shadow-xs"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Linha de Acessório</span>
-                      </button>
-                    </div>
-
-                    <div className="space-y-3">
-                      {/* Quick Add Bar with Quantity for Accessories */}
-                      <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] font-bold text-emerald-900 uppercase">Adicionar Rápido:</span>
-                        
-                        <div className="w-40 sm:w-48 flex-grow">
-                          <input
-                            type="text"
-                            list="catalogDatalist"
-                            value={quickAccCode[env.id] || ''}
-                            onChange={e => setQuickAccCode(prev => ({ ...prev, [env.id]: e.target.value }))}
-                            placeholder="Código (ex: SENS-NTC)"
-                            className="w-full border border-emerald-300 rounded-lg px-2.5 py-1 text-xs font-bold uppercase text-emerald-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <span className="text-[11px] font-bold text-emerald-900">Qtd:</span>
-                          <div className="flex items-center border border-emerald-300 rounded-lg bg-white overflow-hidden shadow-xs">
-                            <button
-                              type="button"
-                              onClick={() => setQuickAccQty(prev => ({ ...prev, [env.id]: Math.max(1, (prev[env.id] || 1) - 1) }))}
-                              className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="number"
-                              min="1"
-                              value={quickAccQty[env.id] ?? 1}
-                              onChange={e => setQuickAccQty(prev => ({ ...prev, [env.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
-                              className="w-10 border-x border-emerald-200 py-0.5 text-xs font-bold text-center text-slate-900 focus:outline-none"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setQuickAccQty(prev => ({ ...prev, [env.id]: (prev[env.id] || 1) + 1 }))}
-                              className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleQuickAddAccessory(envIdx, env.id)}
-                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Adicionar Acessório</span>
-                        </button>
-                      </div>
-
-                      {/* Accessories Table Headers */}
-                      {env.accessories && env.accessories.length > 0 && (
-                        <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                          <div className="col-span-3">Código (Ref)</div>
-                          <div className="col-span-5">Descrição do Acessório / Periférico</div>
-                          <div className="col-span-3 text-center">Quantidade (Qtd)</div>
-                          <div className="col-span-1 text-right">Ação</div>
-                        </div>
-                      )}
-
-                      {/* Accessories Rows */}
-                      <div className="space-y-2">
-                        {(!env.accessories || env.accessories.length === 0) ? (
-                          <p className="text-xs text-slate-400 italic py-1">Nenhum acessório adicional cadastrado para este ambiente.</p>
-                        ) : (
-                          env.accessories.map((acc, aIdx) => {
-                            const isInCatalog = catalog.some(c => c.code.toUpperCase() === (acc.code || '').trim().toUpperCase());
-
-                            return (
-                              <div
-                                key={aIdx}
-                                className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white border border-slate-200 p-2 rounded-xl transition hover:border-slate-300"
-                              >
-                                {/* Code Input */}
-                                <div className="w-full sm:w-36 md:w-44 flex-shrink-0">
-                                  <input
-                                    type="text"
-                                    list="catalogDatalist"
-                                    value={acc.code}
-                                    onChange={e => handleAccessoryCodeChange(envIdx, aIdx, e.target.value)}
-                                    placeholder="Código (ex: SENS-NTC)"
-                                    className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold uppercase text-emerald-700 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                  />
-                                </div>
-
-                                {/* Description Input */}
-                                <div className="flex-grow">
-                                  <input
-                                    type="text"
-                                    value={acc.name}
-                                    onChange={e => handleAccessoryNameChange(envIdx, aIdx, e.target.value)}
-                                    placeholder="Descrição do acessório ou periférico"
-                                    className="w-full border border-slate-200 bg-slate-50 focus:bg-white rounded-lg px-2 py-1.5 text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                  />
-                                </div>
-
-                                {/* Quantity Stepper Input */}
-                                <div className="flex items-center justify-between sm:justify-start gap-1.5 flex-shrink-0">
-                                  <span className="text-[10px] font-bold text-slate-500 uppercase sm:hidden">Qtd:</span>
-                                  <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-xs">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAccessoryQtyChange(envIdx, aIdx, Math.max(1, (acc.quantity || 1) - 1))}
-                                      className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
-                                      title="Diminuir quantidade"
-                                    >
-                                      <Minus className="w-3 h-3" />
-                                    </button>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      value={acc.quantity ?? 1}
-                                      onChange={e => handleAccessoryQtyChange(envIdx, aIdx, parseInt(e.target.value) || 1)}
-                                      title="Quantidade do acessório"
-                                      className="w-12 text-center text-xs font-bold text-slate-900 border-x border-slate-200 py-1 focus:outline-none focus:bg-emerald-50"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAccessoryQtyChange(envIdx, aIdx, (acc.quantity || 1) + 1)}
-                                      className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 text-xs font-bold transition select-none"
-                                      title="Aumentar quantidade"
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex items-center gap-1 justify-end flex-shrink-0">
-                                  {acc.code && acc.name && !isInCatalog && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleQuickSaveCatalog(acc.code, acc.name)}
-                                      className="px-2 py-1 text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-semibold transition flex items-center gap-1 flex-shrink-0"
-                                      title="Salvar este código e nome no catálogo geral"
-                                    >
-                                      <Sparkles className="w-3 h-3 text-amber-600" />
-                                      <span className="hidden md:inline">+ Catálogo</span>
-                                    </button>
-                                  )}
-
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveAccessory(envIdx, aIdx)}
-                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                                    title="Remover Acessório"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                 </div>
@@ -2049,130 +2574,416 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
       )}
 
       {/* Component Import Preview Modal */}
-      {componentImportPreview && (
+      {componentImportPreview && (() => {
+        const totalItems = componentImportPreview.items.length;
+        const blockedCount = componentImportPreview.items.filter(it => it.wasExcluded).length;
+        const selectedCount = componentImportPreview.items.filter(it => it.selected).length;
+
+        const displayedItems = componentImportPreview.items.filter(it => {
+          if (componentImportPreview.filterTab === 'ready') return it.selected;
+          if (componentImportPreview.filterTab === 'excluded') return it.wasExcluded;
+          return true;
+        });
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              {/* Modal Header */}
+              <div className="px-6 py-4 bg-emerald-50/70 border-b border-emerald-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800">
+                      Importação de Componentes via Excel
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Destino: <span className="font-semibold text-emerald-800">{componentImportPreview.targetTitle}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setComponentImportPreview(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                {/* Warning if any items in this spreadsheet are in the blocked memory */}
+                {blockedCount > 0 && (
+                  <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 flex items-start gap-2.5">
+                    <Ban className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Proteção de Itens Bloqueados:</strong> Localizamos <strong>{blockedCount} componente(s)</strong> nesta planilha que foram excluídos anteriormente de outras listas e estão <strong>bloqueados para não serem importados</strong>.
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    Total: <strong className="text-slate-900">{totalItems}</strong> itens encontrados | Selecionados para importar: <strong className="text-emerald-700">{selectedCount}</strong>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = componentImportPreview.items.map(it => ({ ...it, selected: !it.wasExcluded }));
+                        setComponentImportPreview({ ...componentImportPreview, items: updated });
+                      }}
+                      className="text-[11px] font-bold text-blue-700 hover:underline"
+                    >
+                      Selecionar Não-Bloqueados
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = componentImportPreview.items.map(it => ({ ...it, selected: false }));
+                        setComponentImportPreview({ ...componentImportPreview, items: updated });
+                      }}
+                      className="text-[11px] font-bold text-slate-600 hover:underline"
+                    >
+                      Desmarcar Todos
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex items-center gap-1 border-b border-slate-200 pb-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setComponentImportPreview({ ...componentImportPreview, filterTab: 'all' })}
+                    className={`px-3 py-1 rounded-lg font-bold transition ${
+                      componentImportPreview.filterTab === 'all'
+                        ? 'bg-slate-800 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Todos ({totalItems})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setComponentImportPreview({ ...componentImportPreview, filterTab: 'ready' })}
+                    className={`px-3 py-1 rounded-lg font-bold transition ${
+                      componentImportPreview.filterTab === 'ready'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-emerald-700'
+                    }`}
+                  >
+                    A Importar ({selectedCount})
+                  </button>
+                  {blockedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setComponentImportPreview({ ...componentImportPreview, filterTab: 'excluded' })}
+                      className={`px-3 py-1 rounded-lg font-bold transition ${
+                        componentImportPreview.filterTab === 'excluded'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'text-rose-600 hover:text-rose-800'
+                      }`}
+                    >
+                      Bloqueados ({blockedCount})
+                    </button>
+                  )}
+                </div>
+
+                {/* Items List Preview Table */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                  <div className="max-h-60 overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider sticky top-0 border-b border-slate-200">
+                        <tr>
+                          <th className="px-3 py-2 w-10 text-center">Importar</th>
+                          <th className="px-3 py-2 w-32">Código (Ref)</th>
+                          <th className="px-3 py-2">Descrição</th>
+                          <th className="px-3 py-2 w-16 text-center">Qtd</th>
+                          <th className="px-3 py-2 w-32">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {displayedItems.map((it, idx) => {
+                          const originalIdx = componentImportPreview.items.findIndex(orig => orig === it);
+                          return (
+                            <tr
+                              key={idx}
+                              className={`transition ${
+                                it.selected ? 'bg-white hover:bg-emerald-50/30' : 'bg-slate-50/80 opacity-60 hover:opacity-100'
+                              }`}
+                            >
+                              <td className="px-3 py-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={it.selected}
+                                  onChange={() => {
+                                    const updated = [...componentImportPreview.items];
+                                    updated[originalIdx].selected = !updated[originalIdx].selected;
+                                    setComponentImportPreview({ ...componentImportPreview, items: updated });
+                                  }}
+                                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-3 py-2 font-mono font-bold text-slate-800">
+                                {it.code}
+                              </td>
+                              <td className="px-3 py-2 text-slate-700 font-medium">
+                                {it.name}
+                              </td>
+                              <td className="px-3 py-2 text-center font-bold text-slate-900">
+                                {it.quantity}
+                              </td>
+                              <td className="px-3 py-2">
+                                {it.wasExcluded ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                                    <Ban className="w-3 h-3" />
+                                    <span>Bloqueado</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                    <span>Pronto</span>
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-start gap-2">
+                  <div className="font-bold text-amber-900 mt-0.5">Aviso:</div>
+                  <div>
+                    Você pode <strong>Adicionar</strong> os {selectedCount} itens selecionados aos já existentes ou <strong>Substituir</strong> a lista atual. Itens desmarcados serão memorizados como bloqueados para não entrarem em outras listas.
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setComponentImportPreview(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition self-stretch sm:self-auto text-center"
+                >
+                  Cancelar
+                </button>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    disabled={selectedCount === 0}
+                    onClick={() =>
+                      applyImportedComponents(
+                        componentImportPreview.envIdx,
+                        componentImportPreview.mIdx,
+                        componentImportPreview.isPanel,
+                        componentImportPreview.items,
+                        false
+                      )
+                    }
+                    className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Adicionar ({selectedCount}) aos Existentes</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={selectedCount === 0}
+                    onClick={() =>
+                      applyImportedComponents(
+                        componentImportPreview.envIdx,
+                        componentImportPreview.mIdx,
+                        componentImportPreview.isPanel,
+                        componentImportPreview.items,
+                        true
+                      )
+                    }
+                    className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
+                  >
+                    <span>⟳ Substituir com ({selectedCount})</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Persistent Blocked Components Memory Modal */}
+      {isExcludedModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-emerald-50/70 border-b border-emerald-100 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="px-6 py-4 bg-rose-50 border-b border-rose-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
-                  <FileSpreadsheet className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-700">
+                  <Ban className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">
-                    Importação de Componentes via Excel
+                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <span>Memória de Itens Bloqueados</span>
+                    <span className="text-xs bg-rose-200/70 text-rose-800 font-bold px-2 py-0.5 rounded-full">
+                      {blockedMemoryList.length} item(ns)
+                    </span>
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Destino: <span className="font-semibold text-emerald-800">{componentImportPreview.targetTitle}</span>
+                    Itens excluídos de qualquer máquina ou quadro ficam memorizados para não serem importados nem acrescentados em outras listas
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setComponentImportPreview(null)}
+                onClick={() => setIsExcludedModalOpen(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition"
               >
                 ✕
               </button>
             </div>
 
-            {/* Modal Content */}
+            {/* Body */}
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
-                <span>
-                  Foram localizados <strong className="text-emerald-700">{componentImportPreview.items.length}</strong> itens válidos na planilha.
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  Colunas identificadas: Código (Ref), Descrição e Quantidade
-                </span>
+              {/* Notice */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600 flex items-start gap-2.5">
+                <ShieldAlert className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong>Memória Permanente Ativa:</strong> Mesmo que uma máquina ou lista seja apagada deste pedido, estes itens <strong>não serão importados</strong> de planilhas Excel nem poderão ser acrescentados via Adicionar Rápido em outras listas.
+                </div>
               </div>
 
-              {/* Items List Preview */}
+              {/* Add manual block input */}
+              <div className="bg-rose-50/50 border border-rose-200/80 rounded-xl p-3 space-y-2">
+                <span className="text-xs font-bold text-rose-900 uppercase tracking-wide block">
+                  Adicionar Código / Descrição para Bloquear Manualmente:
+                </span>
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <input
+                    type="text"
+                    list="catalogDatalist"
+                    value={newExcludedCode}
+                    onChange={e => setNewExcludedCode(e.target.value)}
+                    placeholder="Código (ex: COMP-01, VALV-02)"
+                    className="w-full sm:w-44 border border-rose-300 rounded-lg px-2.5 py-1.5 text-xs font-bold uppercase text-rose-950 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                  <input
+                    type="text"
+                    value={newExcludedName}
+                    onChange={e => setNewExcludedName(e.target.value)}
+                    placeholder="Descrição opcional (ou busca automática)"
+                    className="w-full sm:flex-grow border border-rose-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleManualAddExcluded}
+                    className="w-full sm:w-auto px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    <Ban className="w-3.5 h-3.5" />
+                    <span>Bloquear Item</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Search in blocked items */}
+              {blockedMemoryList.length > 0 && (
+                <div className="flex items-center justify-between gap-3">
+                  <input
+                    type="text"
+                    value={blockedSearchQuery}
+                    onChange={e => setBlockedSearchQuery(e.target.value)}
+                    placeholder="Filtrar itens bloqueados..."
+                    className="w-full sm:w-64 border border-slate-300 rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-xs text-slate-500">
+                    Exibindo {blockedMemoryList.filter(it => !blockedSearchQuery || it.code.toLowerCase().includes(blockedSearchQuery.toLowerCase()) || it.name.toLowerCase().includes(blockedSearchQuery.toLowerCase())).length} de {blockedMemoryList.length}
+                  </span>
+                </div>
+              )}
+
+              {/* Blocked Items Table */}
               <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                <div className="max-h-60 overflow-y-auto">
+                <div className="max-h-72 overflow-y-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider sticky top-0 border-b border-slate-200">
                       <tr>
-                        <th className="px-3 py-2 w-10 text-center">#</th>
-                        <th className="px-3 py-2 w-32">Código (Ref)</th>
-                        <th className="px-3 py-2">Descrição</th>
-                        <th className="px-3 py-2 w-20 text-center">Qtd</th>
+                        <th className="px-3 py-2.5 w-10 text-center">#</th>
+                        <th className="px-3 py-2.5 w-36">Código (Ref)</th>
+                        <th className="px-3 py-2.5">Descrição</th>
+                        <th className="px-3 py-2.5 w-44">Origem do Bloqueio</th>
+                        <th className="px-3 py-2.5 w-24 text-right">Ação</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {componentImportPreview.items.map((it, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="px-3 py-2 text-center text-slate-400 font-mono text-[11px]">
-                            {idx + 1}
-                          </td>
-                          <td className="px-3 py-2 font-mono font-bold text-emerald-800">
-                            {it.code}
-                          </td>
-                          <td className="px-3 py-2 text-slate-700 font-medium">
-                            {it.name}
-                          </td>
-                          <td className="px-3 py-2 text-center font-bold text-slate-900">
-                            {it.quantity}
+                      {blockedMemoryList.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">
+                            Nenhum item bloqueado na memória no momento. Quando você excluir componentes de qualquer lista, eles aparecerão aqui automaticamente.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        blockedMemoryList
+                          .filter(it => !blockedSearchQuery || it.code.toLowerCase().includes(blockedSearchQuery.toLowerCase()) || it.name.toLowerCase().includes(blockedSearchQuery.toLowerCase()))
+                          .map((it, idx) => (
+                            <tr key={idx} className="hover:bg-rose-50/40">
+                              <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-[11px]">
+                                {idx + 1}
+                              </td>
+                              <td className="px-3 py-2.5 font-mono font-bold text-rose-800">
+                                {it.code || 'SEM CÓDIGO'}
+                              </td>
+                              <td className="px-3 py-2.5 text-slate-700 font-medium">
+                                {it.name || 'Sem descrição'}
+                              </td>
+                              <td className="px-3 py-2.5 text-slate-500 text-[11px]">
+                                {it.from || 'Lista excluída'}
+                              </td>
+                              <td className="px-3 py-2.5 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUnexcludeItem(it.code, it.name)}
+                                  className="px-2 py-1 bg-white hover:bg-slate-100 text-blue-700 hover:text-blue-900 border border-slate-200 rounded-lg text-[11px] font-bold transition shadow-xs"
+                                  title="Desbloquear este item para permitir importá-lo ou adicioná-lo novamente"
+                                >
+                                  Desbloquear
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-start gap-2">
-                <div className="font-bold text-amber-900 mt-0.5">Aviso:</div>
-                <div>
-                  Este equipamento já possui itens cadastrados. Você pode <strong>Adicionar</strong> estes componentes aos já existentes ou <strong>Substituir</strong> todos os itens atuais pela lista importada.
-                </div>
-              </div>
             </div>
 
-            {/* Modal Actions */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              {blockedMemoryList.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Tem certeza de que deseja limpar toda a memória de itens bloqueados? Todos os itens poderão ser importados novamente.')) {
+                      handleClearAllExcluded();
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition"
+                >
+                  Limpar Toda a Memória
+                </button>
+              ) : <div />}
+
               <button
                 type="button"
-                onClick={() => setComponentImportPreview(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition self-stretch sm:self-auto text-center"
+                onClick={() => setIsExcludedModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
               >
-                Cancelar
+                Concluído / Fechar
               </button>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyImportedComponents(
-                      componentImportPreview.envIdx,
-                      componentImportPreview.mIdx,
-                      componentImportPreview.isPanel,
-                      componentImportPreview.items,
-                      false
-                    )
-                  }
-                  className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Adicionar aos Existentes</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyImportedComponents(
-                      componentImportPreview.envIdx,
-                      componentImportPreview.mIdx,
-                      componentImportPreview.isPanel,
-                      componentImportPreview.items,
-                      true
-                    )
-                  }
-                  className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
-                >
-                  <span>⟳ Substituir Itens Atuais</span>
-                </button>
-              </div>
             </div>
           </div>
         </div>
