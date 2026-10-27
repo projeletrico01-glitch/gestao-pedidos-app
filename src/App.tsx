@@ -27,7 +27,7 @@ import { OrderKanban } from './components/OrderKanban';
 import { OrderCalendar } from './components/OrderCalendar';
 import { OrderDetailView } from './components/OrderDetailView';
 import { CatalogModal } from './components/CatalogModal';
-import { NewOrderModal } from './components/NewOrderModal';
+import { NewOrderModal, NewOrderInitialData } from './components/NewOrderModal';
 import { PrintProductionSheet } from './components/PrintProductionSheet';
 import { Toast } from './components/Toast';
 import { TermoprolLogo } from './components/TermoprolLogo';
@@ -141,6 +141,7 @@ export default function App() {
   // Modals
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
+  const [newOrderInitialData, setNewOrderInitialData] = useState<NewOrderInitialData | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -150,6 +151,29 @@ export default function App() {
   // Gmail Integration States & Active Visual Alert
   const [gmailUser, setGmailUser] = useState<User | null>(null);
   const [activeGmailAlert, setActiveGmailAlert] = useState<GmailAlertItem | null>(null);
+
+  // Handlers for starting new orders
+  const handleOpenNewOrder = () => {
+    setNewOrderInitialData(null);
+    setIsNewOrderModalOpen(true);
+  };
+
+  const handleStartOrderFromEmail = (parsed: any, emailItem: GmailAlertItem) => {
+    setNewOrderInitialData({
+      orderNumber: parsed?.orderNumber || '',
+      customer: parsed?.customer || '',
+      deliveryDate: parsed?.deliveryDate || '',
+      notes: parsed?.notes || '',
+      environments: parsed?.detectedEnvironments || [],
+      fromEmail: {
+        sender: emailItem.sender,
+        subject: emailItem.subject,
+        rawDate: parsed?.formattedDeliveryDate || parsed?.deliveryDate || ''
+      }
+    });
+    setIsNewOrderModalOpen(true);
+    showToast(`Dados extraídos do e-mail (${parsed?.orderNumber || 'Novo PV'} - ${parsed?.customer || 'Cliente'}) prontos para cadastro!`, 'success');
+  };
 
   // Initialize Firebase Auth listener for Google Workspace
   useEffect(() => {
@@ -511,7 +535,7 @@ export default function App() {
 
   const appBackground = themeMode === 'dark' 
     ? 'bg-slate-950 text-slate-100' 
-    : 'bg-slate-50 text-slate-800';
+    : 'bg-slate-100 text-slate-950';
 
   return (
     <div className={`min-h-screen antialiased selection:bg-blue-100 selection:text-blue-900 ${appBackground} ${density === 'compact' ? 'text-xs' : 'text-sm'}`}>
@@ -545,7 +569,7 @@ export default function App() {
             onSelectStatusFilter={setStatusFilter}
             onOpenCatalog={() => setIsCatalogModalOpen(true)}
             onOpenNomenclature={() => setIsNomenclatureModalOpen(true)}
-            onOpenNewOrder={() => setIsNewOrderModalOpen(true)}
+            onOpenNewOrder={handleOpenNewOrder}
             onImportOrdersExcel={handleImportOrdersExcel}
             onExportOrdersExcel={handleExportOrdersExcel}
             onDownloadOrdersTemplate={downloadOrdersTemplate}
@@ -558,19 +582,25 @@ export default function App() {
 
           <div className="flex-1 flex flex-col min-w-0 min-h-screen">
             {/* Sidebar ERP Top Bar */}
-            <header className="h-16 px-6 border-b border-slate-200/80 bg-white shadow-xs flex items-center justify-between gap-4 no-print sticky top-0 z-20">
+            <header className={`h-16 px-6 border-b flex items-center justify-between gap-4 no-print sticky top-0 z-20 ${
+              themeMode === 'dark' 
+                ? 'bg-slate-900 border-slate-800 text-white' 
+                : 'bg-white border-slate-200 text-slate-950 shadow-xs'
+            }`}>
               <div className="flex items-center gap-3">
                 {isSidebarCollapsed && (
                   <div onClick={() => setCurrentView('dashboard')} className="cursor-pointer mr-1">
-                    <TermoprolLogo variant="icon" theme="light" size="sm" />
+                    <TermoprolLogo variant="icon" theme={themeMode === 'dark' ? 'dark' : 'light'} size="sm" />
                   </div>
                 )}
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-900 text-sm sm:text-base">
+                  <span className={`font-black text-sm sm:text-base ${
+                    themeMode === 'dark' ? 'text-white' : 'text-slate-950'
+                  }`}>
                     {currentView === 'dashboard' ? 'Painel de Produção & Pedidos' : `Pedido ${activeOrder?.orderNumber}`}
                   </span>
                   {statusFilter !== 'ALL' && currentView === 'dashboard' && (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-950 font-black border border-blue-300">
                       Filtro: {statusFilter === 'Under15Days' ? '< 15 Dias' : statusFilter}
                     </span>
                   )}
@@ -582,14 +612,16 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsGmailModalOpen(true)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition flex items-center gap-1.5 border shadow-xs ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition flex items-center gap-1.5 border shadow-xs cursor-pointer ${
                     activeGmailAlert
                       ? 'bg-red-600 hover:bg-red-500 text-white border-red-500 animate-pulse ring-2 ring-red-400 shadow-md shadow-red-600/30'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                      : themeMode === 'dark'
+                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-900 border-slate-200 font-bold'
                   }`}
                   title="Monitor de E-mails do Gmail para Remetentes Cadastrados"
                 >
-                  <Mail className={`w-3.5 h-3.5 ${activeGmailAlert ? 'text-white' : 'text-red-500'}`} />
+                  <Mail className={`w-3.5 h-3.5 ${activeGmailAlert ? 'text-white' : 'text-red-600'}`} />
                   <span className="hidden sm:inline">Gmail</span>
                   {activeGmailAlert && (
                     <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-white text-red-700">
@@ -598,11 +630,30 @@ export default function App() {
                   )}
                 </button>
 
+                {/* High Contrast Theme Toggle Button */}
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className={`px-3 py-1.5 text-xs font-black rounded-xl transition flex items-center gap-1.5 border cursor-pointer shadow-xs ${
+                    themeMode === 'dark'
+                      ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-slate-700'
+                      : 'bg-amber-100 hover:bg-amber-200 text-amber-950 border-amber-300'
+                  }`}
+                  title="Alternar Modo Claro (Escrita Escura para Fácil Leitura) / Escuro"
+                >
+                  <Sun className={`w-3.5 h-3.5 ${themeMode === 'dark' ? 'text-amber-400' : 'text-amber-600'}`} />
+                  <span className="hidden md:inline">{themeMode === 'dark' ? 'Modo Claro' : 'Layout Claro'}</span>
+                </button>
+
                 {/* Layout Mode Button */}
                 <button
                   type="button"
                   onClick={toggleLayout}
-                  className="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition flex items-center gap-1.5 border border-slate-200"
+                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition flex items-center gap-1.5 border cursor-pointer ${
+                    themeMode === 'dark'
+                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
+                  }`}
                   title="Mudar para Layout Superior (Topbar Clássico)"
                 >
                   <LayoutGrid className="w-3.5 h-3.5 text-blue-600" />
@@ -613,7 +664,11 @@ export default function App() {
                 <button
                   type="button"
                   onClick={toggleDensity}
-                  className="p-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition border border-slate-200"
+                  className={`p-2 text-xs font-bold rounded-xl transition border cursor-pointer ${
+                    themeMode === 'dark'
+                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
+                  }`}
                   title="Alternar Densidade (Compacto / Confortável)"
                 >
                   <Sliders className="w-4 h-4 text-slate-600" />
@@ -622,8 +677,8 @@ export default function App() {
                 {/* Quick Add Order */}
                 <button
                   type="button"
-                  onClick={() => setIsNewOrderModalOpen(true)}
-                  className="px-3.5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-sm transition flex items-center gap-1.5 active:scale-95"
+                  onClick={handleOpenNewOrder}
+                  className="px-3.5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-sm transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Novo Pedido</span>
@@ -640,18 +695,18 @@ export default function App() {
                     
                     {/* Search Bar */}
                     <div className="relative flex-grow max-w-md">
-                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                       <input
                         type="text"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         placeholder="Buscar pedido, cliente, máquina ou código..."
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+                        className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-950 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
                       />
                       {searchTerm && (
                         <button
                           onClick={() => setSearchTerm('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-black"
                         >
                           ×
                         </button>
@@ -662,13 +717,13 @@ export default function App() {
                     <div className="flex flex-wrap items-center gap-3 justify-between lg:justify-end">
                       {/* AppSheet Filter */}
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
+                        <span className="text-xs font-black text-slate-800 uppercase tracking-wider hidden sm:inline">
                           AppSheet:
                         </span>
                         <select
                           value={appSheetFilter}
                           onChange={e => setAppSheetFilter(e.target.value)}
-                          className="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="bg-white border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
                         >
                           <option value="ALL">Todos</option>
                           <option value="SIM">SIM</option>
@@ -681,7 +736,7 @@ export default function App() {
                         <select
                           value={sortBy}
                           onChange={e => setSortBy(e.target.value as any)}
-                          className="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="bg-white border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
                         >
                           <option value="status">Prioridade: Pendentes 1º → Em Andamento → Entregues</option>
                           <option value="urgency">Mais Urgentes (Prazo)</option>
@@ -692,13 +747,13 @@ export default function App() {
                       </div>
 
                       {/* View Tabs */}
-                      <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-medium">
+                      <div className="inline-flex bg-slate-200/80 p-1 rounded-xl border border-slate-300 text-xs font-bold">
                         <button
                           onClick={() => setDashboardTab('table')}
-                          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                             dashboardTab === 'table'
-                              ? 'bg-white text-slate-900 font-bold shadow-xs'
-                              : 'text-slate-500 hover:text-slate-900'
+                              ? 'bg-white text-slate-950 font-black shadow-xs'
+                              : 'text-slate-700 hover:text-slate-950 font-bold'
                           }`}
                         >
                           <ListOrdered className="w-3.5 h-3.5" />
@@ -707,10 +762,10 @@ export default function App() {
 
                         <button
                           onClick={() => setDashboardTab('kanban')}
-                          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                             dashboardTab === 'kanban'
-                              ? 'bg-white text-slate-900 font-bold shadow-xs'
-                              : 'text-slate-500 hover:text-slate-900'
+                              ? 'bg-white text-slate-950 font-black shadow-xs'
+                              : 'text-slate-700 hover:text-slate-950 font-bold'
                           }`}
                         >
                           <Columns3 className="w-3.5 h-3.5" />
@@ -719,17 +774,16 @@ export default function App() {
 
                         <button
                           onClick={() => setDashboardTab('calendar')}
-                          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                          className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                             dashboardTab === 'calendar'
-                              ? 'bg-white text-slate-900 font-bold shadow-xs'
-                              : 'text-slate-500 hover:text-slate-900'
+                              ? 'bg-white text-slate-950 font-black shadow-xs'
+                              : 'text-slate-700 hover:text-slate-950 font-bold'
                           }`}
                         >
                           <Calendar className="w-3.5 h-3.5" />
                           <span>Agenda</span>
                         </button>
                       </div>
-
                     </div>
                   </div>
 
@@ -824,7 +878,7 @@ export default function App() {
             onToggleDensity={toggleDensity}
             onOpenCatalog={() => setIsCatalogModalOpen(true)}
             onOpenNomenclature={() => setIsNomenclatureModalOpen(true)}
-            onOpenNewOrder={() => setIsNewOrderModalOpen(true)}
+            onOpenNewOrder={handleOpenNewOrder}
             onImportOrdersExcel={handleImportOrdersExcel}
             onExportOrdersExcel={handleExportOrdersExcel}
             onExportJsonBackup={handleExportJsonBackup}
@@ -841,18 +895,18 @@ export default function App() {
                   
                   {/* Search Bar */}
                   <div className="relative flex-grow max-w-md">
-                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
                       type="text"
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                       placeholder="Buscar pedido, cliente, máquina ou código..."
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+                      className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-950 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
                     />
                     {searchTerm && (
                       <button
                         onClick={() => setSearchTerm('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-black"
                       >
                         ×
                       </button>
@@ -864,13 +918,13 @@ export default function App() {
                     
                     {/* Status Filter */}
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
+                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider hidden sm:inline">
                         Status:
                       </span>
                       <select
                         value={statusFilter}
                         onChange={e => setStatusFilter(e.target.value)}
-                        className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
                       >
                         <option value="ALL">Todos os Status</option>
                         <option value="Pendente">🔴 Pendente</option>
@@ -883,13 +937,13 @@ export default function App() {
 
                     {/* AppSheet Filter */}
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
+                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider hidden sm:inline">
                         AppSheet:
                       </span>
                       <select
                         value={appSheetFilter}
                         onChange={e => setAppSheetFilter(e.target.value)}
-                        className="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="bg-white border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
                       >
                         <option value="ALL">Todos</option>
                         <option value="SIM">SIM</option>
@@ -902,7 +956,7 @@ export default function App() {
                       <select
                         value={sortBy}
                         onChange={e => setSortBy(e.target.value as any)}
-                        className="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="bg-white border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
                       >
                         <option value="status">Prioridade: Pendentes 1º → Em Andamento → Entregues</option>
                         <option value="urgency">Ordenar: Mais Urgentes</option>
@@ -913,13 +967,13 @@ export default function App() {
                     </div>
 
                     {/* View Mode Tabs (Tabela, Kanban, Agenda) */}
-                    <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-medium">
+                    <div className="inline-flex bg-slate-200/80 p-1 rounded-xl border border-slate-300 text-xs font-bold">
                       <button
                         onClick={() => setDashboardTab('table')}
-                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                           dashboardTab === 'table'
-                            ? 'bg-white text-slate-900 font-bold shadow-xs'
-                            : 'text-slate-500 hover:text-slate-900'
+                            ? 'bg-white text-slate-950 font-black shadow-xs'
+                            : 'text-slate-700 hover:text-slate-950 font-bold'
                         }`}
                       >
                         <ListOrdered className="w-3.5 h-3.5" />
@@ -928,10 +982,10 @@ export default function App() {
 
                       <button
                         onClick={() => setDashboardTab('kanban')}
-                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                           dashboardTab === 'kanban'
-                            ? 'bg-white text-slate-900 font-bold shadow-xs'
-                            : 'text-slate-500 hover:text-slate-900'
+                            ? 'bg-white text-slate-950 font-black shadow-xs'
+                            : 'text-slate-700 hover:text-slate-950 font-bold'
                         }`}
                       >
                         <Columns3 className="w-3.5 h-3.5" />
@@ -940,10 +994,10 @@ export default function App() {
 
                       <button
                         onClick={() => setDashboardTab('calendar')}
-                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
                           dashboardTab === 'calendar'
-                            ? 'bg-white text-slate-900 font-bold shadow-xs'
-                            : 'text-slate-500 hover:text-slate-900'
+                            ? 'bg-white text-slate-950 font-black shadow-xs'
+                            : 'text-slate-700 hover:text-slate-950 font-bold'
                         }`}
                       >
                         <Calendar className="w-3.5 h-3.5" />
@@ -1107,8 +1161,12 @@ export default function App() {
       {/* New Order Modal */}
       <NewOrderModal
         isOpen={isNewOrderModalOpen}
-        onClose={() => setIsNewOrderModalOpen(false)}
+        onClose={() => {
+          setIsNewOrderModalOpen(false);
+          setNewOrderInitialData(null);
+        }}
         onCreateOrder={handleCreateOrder}
+        initialData={newOrderInitialData}
       />
 
       {/* Modal Confirmation for Order Deletion */}
@@ -1153,45 +1211,74 @@ export default function App() {
 
       {/* Floating Persistent Visual Alert Banner when an email from registered sender arrives */}
       {activeGmailAlert && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 animate-in slide-in-from-top duration-300">
-          <div className="bg-gradient-to-r from-red-600 via-amber-600 to-red-700 text-white p-4 rounded-2xl shadow-2xl border-2 border-amber-300 ring-4 ring-red-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-bold text-white shrink-0 shadow-inner">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-3xl px-4 animate-in slide-in-from-top duration-300">
+          <div className="bg-gradient-to-r from-red-600 via-amber-600 to-red-700 text-white p-4 rounded-2xl shadow-2xl border-2 border-amber-300 ring-4 ring-red-500/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-bold text-white shrink-0 shadow-inner mt-0.5">
                 <AlertTriangle className="w-6 h-6 text-amber-200 animate-bounce" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full text-white">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full text-white">
                     🚨 E-mail de Remetente Cadastrado!
                   </span>
-                  <span className="text-xs text-amber-100 font-semibold truncate max-w-[200px]">
+                  <span className="text-xs text-amber-100 font-semibold truncate max-w-[220px]">
                     {activeGmailAlert.sender}
                   </span>
                 </div>
                 <p className="text-xs font-bold text-white mt-1 line-clamp-1">
                   {activeGmailAlert.subject}
                 </p>
-                <p className="text-[11px] text-amber-100/90 italic line-clamp-1">
+
+                {/* Extracted Fields Badges */}
+                {activeGmailAlert.parsedOrder && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className="px-2 py-0.5 rounded-md bg-white/25 text-white text-[10px] font-extrabold shadow-xs">
+                      PV: {activeGmailAlert.parsedOrder.orderNumber}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-white/20 text-white text-[10px] font-semibold truncate max-w-[150px]">
+                      {activeGmailAlert.parsedOrder.customer}
+                    </span>
+                    {activeGmailAlert.parsedOrder.deliveryDate && (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 text-[10px] font-black shadow-xs">
+                        Embarque: {activeGmailAlert.parsedOrder.formattedDeliveryDate || activeGmailAlert.parsedOrder.deliveryDate}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-[11px] text-amber-100/90 italic line-clamp-1 mt-1">
                   "{activeGmailAlert.snippet}"
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+              {activeGmailAlert.parsedOrder && (
+                <button
+                  type="button"
+                  onClick={() => handleStartOrderFromEmail(activeGmailAlert.parsedOrder!, activeGmailAlert)}
+                  className="px-3.5 py-2 text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl transition shadow-lg flex items-center gap-1.5 active:scale-95 cursor-pointer ring-2 ring-white/50"
+                  title="Iniciar preenchimento do Pedido de Venda com PV, Cliente e Prazo de Embarque deste e-mail"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                  <span>Iniciar Pedido</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setIsGmailModalOpen(true)}
-                className="px-3 py-1.5 text-xs font-semibold bg-white/20 hover:bg-white/30 text-white rounded-xl transition"
+                className="px-3 py-2 text-xs font-semibold bg-white/20 hover:bg-white/30 text-white rounded-xl transition"
               >
-                Ver Detalhes
+                Ver
               </button>
               <button
                 type="button"
                 onClick={() => handleAcknowledgeGmailAlert(activeGmailAlert.id)}
-                className="px-4 py-2 bg-white text-red-900 hover:bg-red-50 font-black text-xs rounded-xl shadow-lg transition flex items-center gap-1.5 active:scale-95"
+                className="px-3.5 py-2 bg-white text-red-900 hover:bg-red-50 font-black text-xs rounded-xl shadow-lg transition flex items-center gap-1.5 active:scale-95"
               >
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>PARAR ALERTA</span>
+                <span>PARAR</span>
               </button>
             </div>
           </div>
@@ -1206,6 +1293,7 @@ export default function App() {
         onUserChange={setGmailUser}
         activeAlert={activeGmailAlert}
         onAcknowledgeAlert={handleAcknowledgeGmailAlert}
+        onStartOrderFromEmail={handleStartOrderFromEmail}
         onShowToast={showToast}
       />
 

@@ -1125,7 +1125,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-bold text-slate-900 mb-1">
               Pedido de Venda *
             </label>
             <input
@@ -1133,12 +1133,12 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
               required
               value={currentOrder.orderNumber}
               onChange={e => handleFieldChange('orderNumber', e.target.value)}
-              className="w-full border border-slate-300 rounded-lg p-2 text-sm font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full border border-slate-300 rounded-lg p-2 text-sm font-black text-blue-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-bold text-slate-900 mb-1">
               Cliente / Razão Social *
             </label>
             <input
@@ -1146,18 +1146,18 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
               required
               value={currentOrder.customer}
               onChange={e => handleFieldChange('customer', e.target.value)}
-              className="w-full border border-slate-300 rounded-lg p-2 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full border border-slate-300 rounded-lg p-2 text-sm font-bold text-slate-950 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-bold text-slate-900 mb-1">
               AppSheet
             </label>
             <select
               value={currentOrder.appSheet}
               onChange={e => handleFieldChange('appSheet', e.target.value as 'SIM' | 'NÃO')}
-              className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-bold text-slate-950 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
               <option value="SIM">SIM (Integrado)</option>
               <option value="NÃO">NÃO (Convencional)</option>
@@ -1165,15 +1165,15 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+            <label className="block text-xs font-bold text-slate-900 mb-1 flex items-center justify-between">
               <span className="flex items-center gap-1">
                 <Radio className="w-3.5 h-3.5 text-cyan-600" />
                 Supervisório
               </span>
-              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+              <span className={`text-[10px] font-black px-1.5 py-0.2 rounded ${
                 currentOrder.supervisory === 'SIM'
-                  ? 'bg-cyan-100 text-cyan-800 border border-cyan-200'
-                  : 'bg-slate-100 text-slate-500'
+                  ? 'bg-cyan-100 text-cyan-900 border border-cyan-300'
+                  : 'bg-slate-100 text-slate-700'
               }`}>
                 {currentOrder.supervisory === 'SIM' ? 'ATIVO' : 'NÃO'}
               </span>
@@ -1181,10 +1181,10 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
             <select
               value={currentOrder.supervisory || 'NÃO'}
               onChange={e => handleFieldChange('supervisory', e.target.value as 'SIM' | 'NÃO')}
-              className={`w-full border rounded-lg p-2 text-sm font-semibold focus:ring-2 focus:ring-cyan-500 focus:outline-none transition ${
+              className={`w-full border rounded-lg p-2 text-sm font-bold focus:ring-2 focus:ring-cyan-500 focus:outline-none transition ${
                 currentOrder.supervisory === 'SIM'
-                  ? 'border-cyan-400 bg-cyan-50/50 text-cyan-900'
-                  : 'border-slate-300 bg-white text-slate-800'
+                  ? 'border-cyan-400 bg-cyan-50 text-cyan-950 font-black'
+                  : 'border-slate-300 bg-white text-slate-950'
               }`}
             >
               <option value="SIM">SIM (Com Supervisório)</option>
@@ -1193,22 +1193,22 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-bold text-slate-900 mb-1">
               Status do Pedido
             </label>
             <select
-              value={currentOrder.status}
+              value={currentOrder.status === 'Pronto' ? 'Em Andamento' : currentOrder.status}
               onChange={e => handleFieldChange('status', e.target.value as OrderStatus)}
-              className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-black text-slate-950 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              <option value="Pendente">🟡 Pendente</option>
-              <option value="Pronto">🟢 Pronto</option>
-              <option value="Entregue">⚪ Entregue</option>
+              <option value="Pendente" className="text-red-900 font-bold">🔴 Pendente</option>
+              <option value="Em Andamento" className="text-amber-900 font-bold">🟡 Em Andamento</option>
+              <option value="Entregue" className="text-emerald-900 font-bold">🟢 Entregue</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+            <label className="block text-xs font-bold text-slate-900 mb-1 flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-blue-600" />
               Data de Entrega *
             </label>
@@ -1217,7 +1217,7 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
               required
               value={currentOrder.deliveryDate}
               onChange={e => handleFieldChange('deliveryDate', e.target.value)}
-              className="w-full border border-slate-300 rounded-lg p-1.5 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full border border-slate-300 rounded-lg p-1.5 text-sm font-bold text-slate-950 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
         </div>

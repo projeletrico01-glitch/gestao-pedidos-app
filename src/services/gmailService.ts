@@ -8,6 +8,7 @@ import {
   User 
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { parseOrderInfoFromEmail, ParsedOrderFromEmail } from '../utils/emailOrderParser';
 
 // Initialize Firebase App instance safely
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -33,6 +34,8 @@ export interface GmailAlertItem {
   subject: string;
   date: string;
   snippet: string;
+  bodyText: string;
+  parsedOrder: ParsedOrderFromEmail;
   timestamp: number;
 }
 
@@ -80,9 +83,106 @@ export const googleLogout = async () => {
   cachedAccessToken = null;
 };
 
-// Storage keys for registered senders and acknowledged alerts
+// Storage keys for registered senders, acknowledged alerts and processed emails history
 const REGISTERED_SENDERS_KEY = 'termoprol_registered_gmail_senders';
 const ACKNOWLEDGED_ALERTS_KEY = 'termoprol_acknowledged_gmail_alerts';
+const PROCESSED_EMAILS_HISTORY_KEY = 'termoprol_gmail_processed_history';
+
+// Realistic initial history items for Termoprol to illustrate extracted emails
+const defaultHistoryItems: GmailAlertItem[] = [
+  {
+    id: 'demo-gmail-msg-01',
+    threadId: 'demo-thread-01',
+    sender: 'Carlos Silva <compras@frigorificobf.com.br>',
+    senderEmail: 'compras@frigorificobf.com.br',
+    subject: 'Novo Pedido de Venda PV-10482 - Frigorífico Boi Forte',
+    date: 'Ontem às 14:32',
+    snippet: 'Boa tarde equipe Termoprol, segue confirmação do pedido PV-10482 para a nova câmara fria com prazo de embarque para 25/11/2026...',
+    bodyText: 'Boa tarde equipe Termoprol,\n\nSegue confirmação de compra:\nPedido de Venda: PV-10482\nCliente: Frigorífico Boi Forte Ltda\nPrazo de Embarque: 25/11/2026\nAmbientes: Câmara Fria e Desossa\n\nFavor acusar recebimento.\nAtt, Carlos Silva - Compras',
+    parsedOrder: {
+      orderNumber: 'PV-10482',
+      customer: 'Frigorífico Boi Forte Ltda',
+      deliveryDate: '2026-11-25',
+      formattedDeliveryDate: '25/11/2026',
+      notes: 'Importado de e-mail: Novo Pedido de Venda PV-10482 - Frigorífico Boi Forte. Remetente: compras@frigorificobf.com.br. Setores identificados: Câmara Fria, Desossa.',
+      detectedEnvironments: ['Câmara Fria', 'Desossa'],
+      confidence: {
+        hasOrderNumber: true,
+        hasCustomer: true,
+        hasDeliveryDate: true
+      },
+      rawMatches: {
+        pvText: 'PV-10482',
+        customerText: 'Frigorífico Boi Forte Ltda',
+        shippingDateText: '25/11/2026'
+      }
+    },
+    timestamp: Date.now() - 86400000
+  },
+  {
+    id: 'demo-gmail-msg-02',
+    threadId: 'demo-thread-02',
+    sender: 'Mariana Souza <suprimentos@laticiniosestrela.com.br>',
+    senderEmail: 'suprimentos@laticiniosestrela.com.br',
+    subject: 'Aprovação PV-10519 - Laticínios Estrela do Vale',
+    date: 'Hoje às 09:15',
+    snippet: 'Prezados, estamos formalizando o PV-10519. Cliente: Laticínios Estrela do Vale. Data de embarque acordada para 12/12/2026...',
+    bodyText: 'Prezados,\n\nEstamos formalizando o pedido:\nPV: 10519\nCliente: Laticínios Estrela do Vale S/A\nData de embarque: 12/12/2026\nSetores: Sala de Pasteurização e Recepção de Leite\n\nAtt,\nMariana Souza',
+    parsedOrder: {
+      orderNumber: 'PV-10519',
+      customer: 'Laticínios Estrela do Vale S/A',
+      deliveryDate: '2026-12-12',
+      formattedDeliveryDate: '12/12/2026',
+      notes: 'Importado de e-mail: Aprovação PV-10519 - Laticínios Estrela do Vale. Remetente: suprimentos@laticiniosestrela.com.br. Setores identificados: Sala de Pasteurização, Recepção de Leite.',
+      detectedEnvironments: ['Sala de Pasteurização', 'Recepção de Leite'],
+      confidence: {
+        hasOrderNumber: true,
+        hasCustomer: true,
+        hasDeliveryDate: true
+      },
+      rawMatches: {
+        pvText: 'PV: 10519',
+        customerText: 'Laticínios Estrela do Vale S/A',
+        shippingDateText: '12/12/2026'
+      }
+    },
+    timestamp: Date.now() - 14400000
+  }
+];
+
+export const getProcessedEmailsHistory = (): GmailAlertItem[] => {
+  try {
+    const raw = localStorage.getItem(PROCESSED_EMAILS_HISTORY_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return defaultHistoryItems;
+};
+
+export const saveProcessedEmailToHistory = (newItems: GmailAlertItem[]): GmailAlertItem[] => {
+  try {
+    const current = getProcessedEmailsHistory();
+    const map = new Map<string, GmailAlertItem>();
+    current.forEach(item => map.set(item.id, item));
+    newItems.forEach(item => map.set(item.id, item));
+
+    const sorted = Array.from(map.values())
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .slice(0, 10); // Exibe e mantém os últimos 10 e-mails processados
+
+    localStorage.setItem(PROCESSED_EMAILS_HISTORY_KEY, JSON.stringify(sorted));
+    return sorted;
+  } catch (err) {
+    console.warn('Erro ao salvar histórico de e-mails processados:', err);
+    return [];
+  }
+};
+
+export const clearProcessedHistory = () => {
+  localStorage.setItem(PROCESSED_EMAILS_HISTORY_KEY, JSON.stringify([]));
+};
 
 export const getRegisteredSenders = (): string[] => {
   try {
@@ -183,14 +283,52 @@ export const fetchRecentEmailsFromSenders = async (
 
   if (messages.length === 0) return [];
 
-  // Fetch details for up to 5 newest messages
+  // Helper to decode Gmail's web-safe base64
+  const decodeBase64Utf8 = (base64Str: string): string => {
+    try {
+      const base64 = base64Str.replace(/-/g, '+').replace(/_/g, '/');
+      const binary = atob(base64);
+      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    } catch {
+      return '';
+    }
+  };
+
+  // Helper to extract plain text recursively from message payload
+  const extractBodyText = (payload: any): string => {
+    if (!payload) return '';
+    let result = '';
+
+    if (payload.body?.data) {
+      result += decodeBase64Utf8(payload.body.data) + ' ';
+    }
+
+    if (payload.parts && Array.isArray(payload.parts)) {
+      for (const part of payload.parts) {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          result += decodeBase64Utf8(part.body.data) + ' ';
+        } else if (part.mimeType === 'text/html' && part.body?.data && !result.trim()) {
+          const html = decodeBase64Utf8(part.body.data);
+          result += html.replace(/<[^>]+>/g, ' ') + ' ';
+        }
+        if (part.parts) {
+          result += extractBodyText(part) + ' ';
+        }
+      }
+    }
+
+    return result.replace(/\s+/g, ' ').trim();
+  };
+
+  // Fetch details for up to 10 newest messages
   const items: GmailAlertItem[] = [];
-  const subset = messages.slice(0, 5);
+  const subset = messages.slice(0, 10);
 
   for (const m of subset) {
     try {
       const msgRes = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=full`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!msgRes.ok) continue;
@@ -206,6 +344,13 @@ export const fetchRecentEmailsFromSenders = async (
       const emailMatch = fromHeader.match(/<([^>]+)>/);
       const senderEmail = emailMatch ? emailMatch[1].toLowerCase() : fromHeader.toLowerCase();
 
+      // Extract full body text and snippet
+      const bodyText = extractBodyText(detail.payload);
+      const snippet = detail.snippet || '';
+
+      // Filter and extract PV, Cliente and Prazo de Embarque from email content
+      const parsedOrder = parseOrderInfoFromEmail(subjectHeader, bodyText, snippet);
+
       items.push({
         id: m.id,
         threadId: m.threadId,
@@ -213,12 +358,19 @@ export const fetchRecentEmailsFromSenders = async (
         senderEmail,
         subject: subjectHeader,
         date: dateHeader,
-        snippet: detail.snippet || '',
+        snippet,
+        bodyText,
+        parsedOrder,
         timestamp: Number(detail.internalDate) || Date.now()
       });
-    } catch {
-      // ignore single message fetch error
+    } catch (err) {
+      console.warn('Erro ao processar mensagem do Gmail:', err);
     }
+  }
+
+  // Automatically save to the 10 processed emails history
+  if (items.length > 0) {
+    saveProcessedEmailToHistory(items);
   }
 
   return items;

@@ -1,18 +1,33 @@
-import React, { useState } from 'react';
-import { FilePlus, X, Calendar, User, Hash, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FilePlus, X, Calendar, User, Hash, FileText, Sparkles, Mail, CheckCircle2 } from 'lucide-react';
 import { Order } from '../types';
 import { getRelativeDate } from '../data/initialData';
+
+export interface NewOrderInitialData {
+  orderNumber?: string;
+  customer?: string;
+  deliveryDate?: string;
+  notes?: string;
+  environments?: string[];
+  fromEmail?: {
+    sender: string;
+    subject: string;
+    rawDate?: string;
+  };
+}
 
 interface NewOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateOrder: (order: Order) => void;
+  initialData?: NewOrderInitialData | null;
 }
 
 export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   isOpen,
   onClose,
-  onCreateOrder
+  onCreateOrder,
+  initialData
 }) => {
   const [orderNumber, setOrderNumber] = useState(`PV-${Math.floor(1000 + Math.random() * 9000)}`);
   const [customer, setCustomer] = useState('');
@@ -21,11 +36,50 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   const [deliveryDate, setDeliveryDate] = useState(getRelativeDate(7));
   const [notes, setNotes] = useState('');
 
+  // Synchronize fields when modal opens or initialData changes
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        if (initialData.orderNumber) setOrderNumber(initialData.orderNumber);
+        if (initialData.customer) setCustomer(initialData.customer);
+        if (initialData.deliveryDate) setDeliveryDate(initialData.deliveryDate);
+        if (initialData.notes) setNotes(initialData.notes);
+      } else {
+        setOrderNumber(`PV-${Math.floor(1000 + Math.random() * 9000)}`);
+        setCustomer('');
+        setDeliveryDate(getRelativeDate(7));
+        setNotes('');
+      }
+    }
+  }, [isOpen, initialData]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!orderNumber.trim() || !customer.trim()) return;
+
+    const initialEnvironments = (initialData?.environments && initialData.environments.length > 0)
+      ? initialData.environments.map((envName, idx) => ({
+          id: 'env-' + Date.now() + '-' + idx,
+          name: envName,
+          operatingTemperature: '',
+          evaporatorDistance: '',
+          machines: [],
+          panel: { description: '', items: [] },
+          accessories: []
+        }))
+      : [
+          {
+            id: 'env-' + Date.now(),
+            name: 'Ambiente Principal',
+            operatingTemperature: '',
+            evaporatorDistance: '',
+            machines: [],
+            panel: { description: '', items: [] },
+            accessories: []
+          }
+        ];
 
     const newOrder: Order = {
       id: 'ord-' + Date.now(),
@@ -37,17 +91,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
       deliveryDate,
       notes: notes.trim(),
       createdAt: new Date().toISOString(),
-      environments: [
-        {
-          id: 'env-' + Date.now(),
-          name: 'Ambiente Principal',
-          operatingTemperature: '',
-          evaporatorDistance: '',
-          machines: [],
-          panel: { description: '', items: [] },
-          accessories: []
-        }
-      ]
+      environments: initialEnvironments
     };
 
     onCreateOrder(newOrder);
@@ -84,6 +128,25 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          
+          {/* Email Auto-fill Notification Badge */}
+          {initialData?.fromEmail && (
+            <div className="bg-amber-50 border border-amber-300 p-3 rounded-xl flex items-start gap-2.5 text-xs text-amber-950 animate-in fade-in duration-150">
+              <Sparkles className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-bold flex items-center gap-1.5">
+                  <span>Importado Automaticamente do Gmail</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 font-black">
+                    PV &bull; Cliente &bull; Prazo
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  Campos extraídos do e-mail recebido de <strong>{initialData.fromEmail.sender}</strong>. Você pode ajustar qualquer dado antes de salvar.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
               <Hash className="w-3.5 h-3.5 text-blue-600" />
