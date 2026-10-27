@@ -15,7 +15,8 @@ import {
   LayoutGrid,
   Sun,
   Moon,
-  Sliders
+  Sliders,
+  Mail
 } from 'lucide-react';
 import { Order } from '../types';
 import { calculateRemainingDays } from '../utils/excel';
@@ -27,6 +28,8 @@ interface HeaderProps {
   layoutMode?: 'sidebar' | 'topbar';
   themeMode?: 'light' | 'dark';
   density?: 'comfortable' | 'compact';
+  gmailAlertCount?: number;
+  onOpenGmailModal?: () => void;
   onToggleLayout?: () => void;
   onToggleTheme?: () => void;
   onToggleDensity?: () => void;
@@ -46,6 +49,8 @@ export const Header: React.FC<HeaderProps> = ({
   layoutMode = 'topbar',
   themeMode = 'light',
   density = 'comfortable',
+  gmailAlertCount = 0,
+  onOpenGmailModal,
   onToggleLayout,
   onToggleTheme,
   onToggleDensity,
@@ -67,6 +72,10 @@ export const Header: React.FC<HeaderProps> = ({
   const overdueOrders = orders.filter(o => {
     const rem = calculateRemainingDays(o.deliveryDate, o.status);
     return rem.isOverdue;
+  }).length;
+  const under15DaysOrders = orders.filter(o => {
+    const rem = calculateRemainingDays(o.deliveryDate, o.status);
+    return rem.isUnder15Days;
   }).length;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,6 +123,15 @@ export const Header: React.FC<HeaderProps> = ({
               <Truck className="w-3.5 h-3.5 text-emerald-400" />
               <span>Entregues: <strong className="text-white">{deliveredOrders}</strong></span>
             </div>
+            {under15DaysOrders > 0 && (
+              <>
+                <div className="h-3 w-px bg-slate-700" />
+                <div className="flex items-center gap-1.5 px-2 text-amber-300 font-bold bg-amber-950/50 py-0.5 rounded-lg border border-amber-800/60" title="Pedidos com data de entrega inferior a 15 dias">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  <span>&lt; 15 dias: <strong className="text-amber-200">{under15DaysOrders}</strong></span>
+                </div>
+              </>
+            )}
             {overdueOrders > 0 && (
               <>
                 <div className="h-3 w-px bg-slate-700" />
@@ -127,6 +145,28 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Gmail Monitor Button */}
+            {onOpenGmailModal && (
+              <button
+                type="button"
+                onClick={onOpenGmailModal}
+                className={`px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition border flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                  gmailAlertCount > 0
+                    ? 'bg-red-600 hover:bg-red-500 text-white border-red-400 animate-pulse ring-2 ring-red-400/50 shadow-md shadow-red-600/30'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
+                title="Monitor de E-mails do Gmail para Remetentes Cadastrados"
+              >
+                <Mail className={`w-4 h-4 ${gmailAlertCount > 0 ? 'text-white' : 'text-red-400'}`} />
+                <span className="hidden md:inline">Gmail</span>
+                {gmailAlertCount > 0 && (
+                  <span className="bg-white text-red-700 text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                    {gmailAlertCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {/* Catalog Button */}
             <button
               onClick={onOpenCatalog}

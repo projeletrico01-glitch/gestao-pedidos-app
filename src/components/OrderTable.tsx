@@ -9,7 +9,8 @@ import {
   Layers, 
   Fan, 
   ArrowUpDown,
-  ExternalLink
+  ExternalLink,
+  AlertTriangle
 } from 'lucide-react';
 import { Order, OrderStatus } from '../types';
 import { formatDateBR, calculateRemainingDays, getOrderTotals } from '../utils/excel';
@@ -195,9 +196,19 @@ export const OrderTable: React.FC<OrderTableProps> = ({
 
                   {/* Remaining Days */}
                   <td className="py-3 px-3 sm:py-3.5 sm:px-4 text-center whitespace-nowrap">
-                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs ${remaining.badgeClass}`}>
-                      {remaining.text}
-                    </span>
+                    <div className="inline-flex items-center gap-1.5 justify-center">
+                      {remaining.isUnder15Days && (
+                        <span 
+                          className="inline-flex items-center justify-center p-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-400/40 animate-pulse" 
+                          title="Atenção: Prazo de entrega inferior a 15 dias!"
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs ${remaining.badgeClass}`}>
+                        {remaining.text}
+                      </span>
+                    </div>
                   </td>
 
                   {/* Environments & Machines Count */}

@@ -1110,13 +1110,14 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
         </div>
       </div>
 
-      {/* General Information & Order Configuration Card */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 no-print">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2">
-          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-blue-600" />
-            <span>Configurações Gerais do Pedido</span>
-          </h3>
+      {/* General Information & Order Configuration Card (Hidden in Focus Mode) */}
+      {!focusedEnvId && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 no-print">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4 text-blue-600" />
+              <span>Configurações Gerais do Pedido</span>
+            </h3>
           <span className="text-[11px] text-slate-500 font-medium">
             Parâmetros principais, integração AppSheet e sistema supervisório
           </span>
@@ -1249,108 +1250,195 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           />
         </div>
       </div>
+      )}
 
-      {/* Technical Summary Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 no-print">
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <Layers className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] text-slate-500 font-semibold uppercase block">Ambientes</span>
-            <strong className="text-base font-bold text-slate-900">{totalEnvironments}</strong>
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center font-bold">
-            <Fan className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] text-slate-500 font-semibold uppercase block">Máquinas Totais</span>
-            <strong className="text-base font-bold text-slate-900">{totalMachines}</strong>
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-            <Cpu className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] text-slate-500 font-semibold uppercase block">Quadro de Comando</span>
-            <strong className="text-base font-bold text-slate-900">{totalPanelItems}</strong>
-          </div>
-        </div>
-
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-            <Plug className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] text-slate-500 font-semibold uppercase block">Acessórios</span>
-            <strong className="text-base font-bold text-slate-900">{totalAccessories}</strong>
-          </div>
-        </div>
-      </div>
-
-      {/* Technical Specifications Section */}
-      <div className="space-y-4 no-print">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-blue-600" />
-              Especificações Técnicas por Ambiente
-            </h3>
-            <p className="text-xs text-slate-500">
-              Cadastre e configure máquinas, quadro de comando e acessórios com suas respectivas quantidades
-            </p>
+      {/* Focus Mode Sticky Banner when focusedEnvId is active */}
+      {focusedEnvId && (
+        <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white p-4 rounded-2xl shadow-md flex flex-col md:flex-row md:items-center justify-between gap-3 no-print animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-white font-black shadow-inner">
+              <Maximize2 className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full text-white">
+                  Modo de Foco Ativo
+                </span>
+                <span className="text-xs text-amber-100 hidden sm:inline">
+                  (Pressione <kbd className="px-1.5 py-0.5 bg-black/30 rounded text-[10px] font-mono">Esc</kbd> para sair)
+                </span>
+              </div>
+              <p className="text-xs text-white/90 mt-0.5">
+                As demais seções e ambientes estão ocultos para você editar com precisão e foco este ambiente.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Environment Layout Mode Switcher */}
-            <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setEnvDisplayMode('tabs')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-                  envDisplayMode === 'tabs'
-                    ? 'bg-white text-blue-700 shadow-xs font-bold'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-                title="Visualizar um ambiente por vez em abas"
+            {/* Environment switcher dropdown while in focus mode */}
+            <div className="flex items-center gap-1.5 bg-black/20 p-1 rounded-xl">
+              <label className="text-[11px] font-bold text-amber-100 px-2">Ambiente:</label>
+              <select
+                value={focusedEnvId}
+                onChange={(e) => setFocusedEnvId(e.target.value)}
+                className="bg-white text-slate-900 text-xs font-bold rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-300"
               >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Abas por Ambiente</span>
-              </button>
+                {currentOrder.environments.map((env, idx) => (
+                  <option key={env.id} value={env.id}>
+                    {idx + 1}. {env.name || `Ambiente ${idx + 1}`}
+                  </option>
+                ))}
+              </select>
 
+              {/* Quick prev / next buttons */}
               <button
                 type="button"
-                onClick={() => setEnvDisplayMode('cards')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-                  envDisplayMode === 'cards'
-                    ? 'bg-white text-blue-700 shadow-xs font-bold'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-                title="Visualizar todos os ambientes empilhados"
+                onClick={() => {
+                  const currentIdx = currentOrder.environments.findIndex(e => e.id === focusedEnvId);
+                  if (currentIdx > 0) {
+                    setFocusedEnvId(currentOrder.environments[currentIdx - 1].id);
+                  }
+                }}
+                disabled={currentOrder.environments.findIndex(e => e.id === focusedEnvId) <= 0}
+                className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent text-white transition text-xs font-bold"
+                title="Ambiente Anterior"
               >
-                <ListOrdered className="w-3.5 h-3.5" />
-                <span>Lista Completa</span>
+                ← Ant
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const currentIdx = currentOrder.environments.findIndex(e => e.id === focusedEnvId);
+                  if (currentIdx !== -1 && currentIdx < currentOrder.environments.length - 1) {
+                    setFocusedEnvId(currentOrder.environments[currentIdx + 1].id);
+                  }
+                }}
+                disabled={currentOrder.environments.findIndex(e => e.id === focusedEnvId) >= currentOrder.environments.length - 1}
+                className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent text-white transition text-xs font-bold"
+                title="Próximo Ambiente"
+              >
+                Próx →
               </button>
             </div>
 
             <button
               type="button"
-              onClick={handleAddEnvironment}
-              className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95"
+              onClick={() => setFocusedEnvId(null)}
+              className="px-3.5 py-2 text-xs font-bold bg-white text-amber-900 hover:bg-amber-50 rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="Voltar para a visualização completa do pedido (Esc)"
             >
-              <Plus className="w-4 h-4" />
-              <span>Adicionar Ambiente</span>
+              <Minimize2 className="w-4 h-4" />
+              <span>Sair do Foco</span>
             </button>
           </div>
         </div>
+      )}
 
-        {/* Tabs Bar when envDisplayMode is 'tabs' */}
-        {envDisplayMode === 'tabs' && currentOrder.environments && currentOrder.environments.length > 0 && (
+      {/* Technical Summary Bar (Hidden in Focus Mode) */}
+      {!focusedEnvId && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 no-print">
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Ambientes</span>
+              <strong className="text-base font-bold text-slate-900">{totalEnvironments}</strong>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center font-bold">
+              <Fan className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Máquinas Totais</span>
+              <strong className="text-base font-bold text-slate-900">{totalMachines}</strong>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              <Cpu className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Quadro de Comando</span>
+              <strong className="text-base font-bold text-slate-900">{totalPanelItems}</strong>
+            </div>
+          </div>
+
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <Plug className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[11px] text-slate-500 font-semibold uppercase block">Acessórios</span>
+              <strong className="text-base font-bold text-slate-900">{totalAccessories}</strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Technical Specifications Section */}
+      <div className="space-y-4 no-print">
+        {!focusedEnvId && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Layers className="w-5 h-5 text-blue-600" />
+                Especificações Técnicas por Ambiente
+              </h3>
+              <p className="text-xs text-slate-500">
+                Cadastre e configure máquinas, quadro de comando e acessórios com suas respectivas quantidades
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Environment Layout Mode Switcher */}
+              <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setEnvDisplayMode('tabs')}
+                  className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                    envDisplayMode === 'tabs'
+                      ? 'bg-white text-blue-700 shadow-xs font-bold'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                  title="Visualizar um ambiente por vez em abas"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Abas por Ambiente</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setEnvDisplayMode('cards')}
+                  className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+                    envDisplayMode === 'cards'
+                      ? 'bg-white text-blue-700 shadow-xs font-bold'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                  title="Visualizar todos os ambientes empilhados"
+                >
+                  <ListOrdered className="w-3.5 h-3.5" />
+                  <span>Lista Completa</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddEnvironment}
+                className="px-3.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition flex items-center gap-1.5 shadow-sm active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Adicionar Ambiente</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tabs Bar when envDisplayMode is 'tabs' and NOT in focus mode */}
+        {!focusedEnvId && envDisplayMode === 'tabs' && currentOrder.environments && currentOrder.environments.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {currentOrder.environments.map((env, idx) => (
               <div
@@ -1382,6 +1470,22 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                 }`}>
                   {env.machines?.length || 0} máq
                 </span>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFocusedEnvId(env.id);
+                  }}
+                  className={`p-1 rounded-md transition ${
+                    activeEnvTab === idx 
+                      ? 'text-blue-100 hover:text-white hover:bg-blue-700' 
+                      : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+                  }`}
+                  title="Focar este ambiente em tela inteira"
+                >
+                  <Maximize2 className="w-3.5 h-3.5" />
+                </button>
 
                 <button
                   type="button"
@@ -1432,20 +1536,33 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
           </div>
         ) : (
           <div className="space-y-6">
-            {(envDisplayMode === 'tabs'
-              ? (currentOrder.environments[activeEnvTab] 
-                  ? [{ env: currentOrder.environments[activeEnvTab], envIdx: activeEnvTab }] 
-                  : (currentOrder.environments[0] ? [{ env: currentOrder.environments[0], envIdx: 0 }] : []))
-              : currentOrder.environments.map((env, envIdx) => ({ env, envIdx }))
+            {(focusedEnvId
+              ? currentOrder.environments
+                  .map((env, envIdx) => ({ env, envIdx }))
+                  .filter(({ env }) => env.id === focusedEnvId)
+              : (envDisplayMode === 'tabs'
+                  ? (currentOrder.environments[activeEnvTab] 
+                      ? [{ env: currentOrder.environments[activeEnvTab], envIdx: activeEnvTab }] 
+                      : (currentOrder.environments[0] ? [{ env: currentOrder.environments[0], envIdx: 0 }] : []))
+                  : currentOrder.environments.map((env, envIdx) => ({ env, envIdx }))
+                )
             ).map(({ env, envIdx }) => (
               <div
                 key={env.id || envIdx}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all duration-200 ${
+                  focusedEnvId === env.id ? 'border-amber-400 ring-2 ring-amber-300 shadow-md' : 'border-slate-200'
+                }`}
               >
                 {/* Environment Bar Header */}
-                <div className="bg-slate-800 text-white p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  focusedEnvId === env.id ? 'bg-slate-900 border-b border-amber-500/40 text-white' : 'bg-slate-800 text-white'
+                }`}>
                   <div className="flex items-center gap-3 flex-grow">
-                    <span className="bg-slate-700 text-blue-300 w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs border border-slate-600">
+                    <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs border ${
+                      focusedEnvId === env.id
+                        ? 'bg-amber-500 text-slate-950 border-amber-300 font-black'
+                        : 'bg-slate-700 text-blue-300 border-slate-600'
+                    }`}>
                       {envIdx + 1}
                     </span>
                     <input
@@ -1455,9 +1572,44 @@ export const OrderDetailView: React.FC<OrderDetailViewProps> = ({
                       placeholder="Nome / Identificação do Ambiente (ex: Recepção, Câmara Fria)"
                       className="bg-slate-900 border border-slate-700 text-white font-semibold text-sm px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-80"
                     />
+                    {focusedEnvId === env.id && (
+                      <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/40 hidden md:inline-block">
+                        Foco Ativo
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/* Focus Mode Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (focusedEnvId === env.id) {
+                          setFocusedEnvId(null);
+                        } else {
+                          setFocusedEnvId(env.id);
+                        }
+                      }}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition flex items-center gap-1.5 border active:scale-95 ${
+                        focusedEnvId === env.id
+                          ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-400 shadow-sm'
+                          : 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-sm'
+                      }`}
+                      title={focusedEnvId === env.id ? 'Sair do Modo de Foco (Esc)' : 'Focar este ambiente em tela cheia'}
+                    >
+                      {focusedEnvId === env.id ? (
+                        <>
+                          <Minimize2 className="w-3.5 h-3.5" />
+                          <span>Sair do Foco</span>
+                        </>
+                      ) : (
+                        <>
+                          <Maximize2 className="w-3.5 h-3.5" />
+                          <span>Modo de Foco</span>
+                        </>
+                      )}
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleDuplicateEnvironment(envIdx)}

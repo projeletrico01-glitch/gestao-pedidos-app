@@ -19,7 +19,8 @@ import {
   PanelLeftClose,
   PanelLeft,
   Sliders,
-  FileDown
+  FileDown,
+  Mail
 } from 'lucide-react';
 import { Order, ViewMode, LayoutMode, ThemeMode, DensityMode } from '../types';
 import { calculateRemainingDays } from '../utils/excel';
@@ -35,6 +36,8 @@ interface SidebarProps {
   themeMode: ThemeMode;
   layoutMode: LayoutMode;
   density: DensityMode;
+  gmailAlertCount?: number;
+  onOpenGmailModal?: () => void;
   onToggleCollapse: () => void;
   onSelectTab: (tab: ViewMode) => void;
   onSelectStatusFilter: (status: string) => void;
@@ -61,6 +64,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   themeMode,
   layoutMode,
   density,
+  gmailAlertCount = 0,
+  onOpenGmailModal,
   onToggleCollapse,
   onSelectTab,
   onSelectStatusFilter,
@@ -83,6 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const inProgressOrders = orders.filter(o => o.status === 'Em Andamento' || (o.status as any) === 'Pronto').length;
   const deliveredOrders = orders.filter(o => o.status === 'Entregue').length;
   const overdueOrders = orders.filter(o => calculateRemainingDays(o.deliveryDate, o.status).isOverdue).length;
+  const under15DaysOrders = orders.filter(o => calculateRemainingDays(o.deliveryDate, o.status).isUnder15Days).length;
 
   const completionPercent = totalOrders > 0 ? Math.round((deliveredOrders / totalOrders) * 100) : 0;
 
@@ -299,6 +305,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </button>
 
+            {under15DaysOrders > 0 && (
+              <button
+                onClick={() => {
+                  onNavigateHome();
+                  onSelectStatusFilter('Under15Days');
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition ${
+                  statusFilter === 'Under15Days'
+                    ? 'bg-amber-950 text-amber-200 font-bold border border-amber-700 shadow-sm'
+                    : 'text-amber-400 hover:bg-amber-950/40 hover:text-amber-300'
+                } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                title="Pedidos com prazo de entrega inferior a 15 dias"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 animate-pulse flex-shrink-0" />
+                  {!isCollapsed && <span>&lt; 15 Dias</span>}
+                </div>
+                {!isCollapsed && (
+                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-900 text-amber-200 border border-amber-700 animate-pulse">
+                    {under15DaysOrders}
+                  </span>
+                )}
+              </button>
+            )}
+
             {overdueOrders > 0 && (
               <button
                 onClick={() => {
@@ -334,6 +365,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           )}
           <div className="space-y-1">
+            {onOpenGmailModal && (
+              <button
+                onClick={onOpenGmailModal}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition border ${
+                  gmailAlertCount > 0
+                    ? 'bg-red-600 text-white font-bold border-red-500 animate-pulse shadow-md shadow-red-600/30'
+                    : 'text-slate-200 hover:bg-slate-800 border-slate-700/60'
+                } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                title="Monitor de E-mails do Gmail para Remetentes Cadastrados"
+              >
+                <div className="flex items-center gap-2">
+                  <Mail className={`w-4 h-4 flex-shrink-0 ${gmailAlertCount > 0 ? 'text-white' : 'text-red-400'}`} />
+                  {!isCollapsed && <span>Monitor Gmail</span>}
+                </div>
+                {!isCollapsed && gmailAlertCount > 0 && (
+                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-white text-red-700">
+                    {gmailAlertCount}
+                  </span>
+                )}
+              </button>
+            )}
             <button
               onClick={onOpenCatalog}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-amber-300 hover:bg-slate-800 transition border border-amber-500/20 ${

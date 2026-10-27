@@ -32,6 +32,18 @@ import { PrintProductionSheet } from './components/PrintProductionSheet';
 import { Toast } from './components/Toast';
 import { TermoprolLogo } from './components/TermoprolLogo';
 import { NomenclatureDecoder } from './components/NomenclatureDecoder';
+import { GmailAlertModal } from './components/GmailAlertModal';
+import { User } from 'firebase/auth';
+import { 
+  initAuth, 
+  getAccessToken, 
+  getRegisteredSenders, 
+  getAcknowledgedAlerts, 
+  acknowledgeAlert, 
+  fetchRecentEmailsFromSenders, 
+  GmailAlertItem, 
+  playAlertSound 
+} from './services/gmailService';
 import { 
   Search, 
   ListOrdered, 
@@ -51,7 +63,10 @@ import {
   BookMarked,
   Download,
   FileDown,
-  Trash2
+  Trash2,
+  Mail,
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function App() {
@@ -130,6 +145,61 @@ export default function App() {
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [isNomenclatureModalOpen, setIsNomenclatureModalOpen] = useState(false);
+  const [isGmailModalOpen, setIsGmailModalOpen] = useState(false);
+
+  // Gmail Integration States & Active Visual Alert
+  const [gmailUser, setGmailUser] = useState<User | null>(null);
+  const [activeGmailAlert, setActiveGmailAlert] = useState<GmailAlertItem | null>(null);
+
+  // Initialize Firebase Auth listener for Google Workspace
+  useEffect(() => {
+    const unsubscribe = initAuth(
+      (user, token) => {
+        setGmailUser(user);
+        checkGmailAlerts(token);
+      },
+      () => {
+        setGmailUser(null);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // Background Gmail check for registered senders
+  const checkGmailAlerts = async (tokenOverride?: string) => {
+    try {
+      const token = tokenOverride || await getAccessToken();
+      if (!token) return;
+      const senders = getRegisteredSenders();
+      if (senders.length === 0) return;
+      const emails = await fetchRecentEmailsFromSenders(token, senders);
+      const acked = getAcknowledgedAlerts();
+      const unacked = emails.filter(e => !acked.includes(e.id));
+      if (unacked.length > 0) {
+        const newest = unacked[0];
+        setActiveGmailAlert(newest);
+        playAlertSound();
+      } else {
+        setActiveGmailAlert(null);
+      }
+    } catch (err) {
+      console.warn('Gmail background check error:', err);
+    }
+  };
+
+  // Periodic polling every 45 seconds when browser tab is open
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkGmailAlerts();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleAcknowledgeGmailAlert = (alertId: string) => {
+    acknowledgeAlert(alertId);
+    setActiveGmailAlert(null);
+    showToast('Alerta de e-mail confirmado e parado com sucesso!', 'success');
+  };
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -224,7 +294,9 @@ export default function App() {
         const remaining = calculateRemainingDays(order.deliveryDate, order.status);
         let matchesStatus = true;
         if (statusFilter === 'Atrasado') {
-          matchesStatus = remaining.isOverdue;
+          matchesStatus = Boolean(remaining.isOverdue);
+        } else if (statusFilter === 'Under15Days' || statusFilter === '< 15 dias') {
+          matchesStatus = Boolean(remaining.isUnder15Days);
         } else if (statusFilter === 'Em Andamento' || statusFilter === 'Pronto') {
           matchesStatus = order.status === 'Em Andamento' || (order.status as any) === 'Pronto';
         } else if (statusFilter !== 'ALL') {
@@ -466,6 +538,8 @@ export default function App() {
             themeMode={themeMode}
             layoutMode={layoutMode}
             density={density}
+            gmailAlertCount={activeGmailAlert ? 1 : 0}
+            onOpenGmailModal={() => setIsGmailModalOpen(true)}
             onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
             onSelectTab={setDashboardTab}
             onSelectStatusFilter={setStatusFilter}
@@ -497,13 +571,33 @@ export default function App() {
                   </span>
                   {statusFilter !== 'ALL' && currentView === 'dashboard' && (
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200">
-                      Filtro: {statusFilter}
+                      Filtro: {statusFilter === 'Under15Days' ? '< 15 Dias' : statusFilter}
                     </span>
                   )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3">
+                {/* Gmail Monitor Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsGmailModalOpen(true)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition flex items-center gap-1.5 border shadow-xs ${
+                    activeGmailAlert
+                      ? 'bg-red-600 hover:bg-red-500 text-white border-red-500 animate-pulse ring-2 ring-red-400 shadow-md shadow-red-600/30'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                  }`}
+                  title="Monitor de E-mails do Gmail para Remetentes Cadastrados"
+                >
+                  <Mail className={`w-3.5 h-3.5 ${activeGmailAlert ? 'text-white' : 'text-red-500'}`} />
+                  <span className="hidden sm:inline">Gmail</span>
+                  {activeGmailAlert && (
+                    <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-white text-red-700">
+                      1
+                    </span>
+                  )}
+                </button>
+
                 {/* Layout Mode Button */}
                 <button
                   type="button"
@@ -723,6 +817,8 @@ export default function App() {
             layoutMode={layoutMode}
             themeMode={themeMode}
             density={density}
+            gmailAlertCount={activeGmailAlert ? 1 : 0}
+            onOpenGmailModal={() => setIsGmailModalOpen(true)}
             onToggleLayout={toggleLayout}
             onToggleTheme={toggleTheme}
             onToggleDensity={toggleDensity}
@@ -780,6 +876,7 @@ export default function App() {
                         <option value="Pendente">🔴 Pendente</option>
                         <option value="Em Andamento">🟡 Em Andamento</option>
                         <option value="Entregue">🟢 Entregue</option>
+                        <option value="Under15Days">⏰ Prazo &lt; 15 Dias</option>
                         <option value="Atrasado">⚠️ Atrasados</option>
                       </select>
                     </div>
@@ -1053,6 +1150,64 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Floating Persistent Visual Alert Banner when an email from registered sender arrives */}
+      {activeGmailAlert && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 animate-in slide-in-from-top duration-300">
+          <div className="bg-gradient-to-r from-red-600 via-amber-600 to-red-700 text-white p-4 rounded-2xl shadow-2xl border-2 border-amber-300 ring-4 ring-red-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-bold text-white shrink-0 shadow-inner">
+                <AlertTriangle className="w-6 h-6 text-amber-200 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full text-white">
+                    🚨 E-mail de Remetente Cadastrado!
+                  </span>
+                  <span className="text-xs text-amber-100 font-semibold truncate max-w-[200px]">
+                    {activeGmailAlert.sender}
+                  </span>
+                </div>
+                <p className="text-xs font-bold text-white mt-1 line-clamp-1">
+                  {activeGmailAlert.subject}
+                </p>
+                <p className="text-[11px] text-amber-100/90 italic line-clamp-1">
+                  "{activeGmailAlert.snippet}"
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsGmailModalOpen(true)}
+                className="px-3 py-1.5 text-xs font-semibold bg-white/20 hover:bg-white/30 text-white rounded-xl transition"
+              >
+                Ver Detalhes
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAcknowledgeGmailAlert(activeGmailAlert.id)}
+                className="px-4 py-2 bg-white text-red-900 hover:bg-red-50 font-black text-xs rounded-xl shadow-lg transition flex items-center gap-1.5 active:scale-95"
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>PARAR ALERTA</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Gmail Integration & Registered Senders Modal */}
+      <GmailAlertModal
+        isOpen={isGmailModalOpen}
+        onClose={() => setIsGmailModalOpen(false)}
+        user={gmailUser}
+        onUserChange={setGmailUser}
+        activeAlert={activeGmailAlert}
+        onAcknowledgeAlert={handleAcknowledgeGmailAlert}
+        onShowToast={showToast}
+      />
 
       {/* Toast Notifications */}
       <Toast toasts={toasts} onDismiss={handleDismissToast} />

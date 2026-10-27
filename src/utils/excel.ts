@@ -53,7 +53,10 @@ export function calculateRemainingDays(deliveryDateStr: string, status?: OrderSt
       days: 0,
       badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
       text: 'Sem data',
-      isOverdue: false
+      isOverdue: false,
+      isLate: false,
+      isUnder15Days: false,
+      isWarning: false
     };
   }
 
@@ -72,37 +75,65 @@ export function calculateRemainingDays(deliveryDateStr: string, status?: OrderSt
       days: diffDays,
       badgeClass: 'bg-slate-200 text-slate-800 border border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 font-bold',
       text: 'Entregue',
-      isOverdue: false
+      isOverdue: false,
+      isLate: false,
+      isUnder15Days: false,
+      isWarning: false
     };
   }
+
+  const isUnder15Days = diffDays <= 15;
+  const isLate = diffDays < 0;
 
   if (diffDays < 0) {
     return {
       days: diffDays,
       badgeClass: 'bg-red-100 text-red-900 border border-red-300 dark:bg-red-950/80 dark:text-red-300 dark:border-red-700 font-bold',
       text: `${Math.abs(diffDays)} dia(s) atrasado`,
-      isOverdue: true
+      isOverdue: true,
+      isLate: true,
+      isUnder15Days: true,
+      isWarning: true
     };
   } else if (diffDays === 0) {
     return {
       days: 0,
       badgeClass: 'bg-amber-500 text-slate-950 font-bold animate-pulse shadow-sm',
       text: 'Entrega HOJE',
-      isOverdue: false
+      isOverdue: false,
+      isLate: false,
+      isUnder15Days: true,
+      isWarning: true
     };
   } else if (diffDays <= 3) {
     return {
       days: diffDays,
-      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700 font-bold',
+      badgeClass: 'bg-red-100 text-red-900 border border-red-300 dark:bg-red-950/80 dark:text-red-200 dark:border-red-700 font-bold',
       text: `${diffDays} dia(s) restante(s)`,
-      isOverdue: false
+      isOverdue: false,
+      isLate: false,
+      isUnder15Days: true,
+      isWarning: true
+    };
+  } else if (diffDays <= 15) {
+    return {
+      days: diffDays,
+      badgeClass: 'bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700 font-bold',
+      text: `${diffDays} dias restantes`,
+      isOverdue: false,
+      isLate: false,
+      isUnder15Days: true,
+      isWarning: true
     };
   } else {
     return {
       days: diffDays,
       badgeClass: 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700 font-bold',
       text: `${diffDays} dias restantes`,
-      isOverdue: false
+      isOverdue: false,
+      isLate: false,
+      isUnder15Days: false,
+      isWarning: false
     };
   }
 }
